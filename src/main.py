@@ -1,48 +1,48 @@
-import _thread
 import argparse
-import csv
 import os
 import queue
 import sys
-import threading
 import time
 
-from BusinessConfiguration import BAKING_ADDRESS, founders_map, owners_map, specials_map, STANDARD_FEE, supporters_set
-from BusinessConfigurationX import excluded_delegators_set
-from Constants import RunMode
 from NetworkConfiguration import network_config_map
-from calc.payment_calculator import PaymentCalculator
 from calc.service_fee_calculator import ServiceFeeCalculator
+from config.business_json_config_manager import BusinessJsonConfigManager
 from log_config import main_logger
-from model.payment_log import PaymentRecord
-from pay.double_payment_check import check_past_payment
 from pay.payment_consumer import PaymentConsumer
-from tzscan.tzscan_block_api import TzScanBlockApiImpl
-from tzscan.tzscan_reward_api import TzScanRewardApiImpl
-from tzscan.tzscan_reward_calculator import TzScanRewardCalculatorApi
+from pay.regular_payment_producer import ProducerThread
 from util.client_utils import get_client_path
-from util.dir_utils import PAYMENT_FAILED_DIR, PAYMENT_DONE_DIR, BUSY_FILE, remove_busy_file, get_payment_root, \
-    get_calculations_root, get_successful_payments_dir, get_failed_payments_dir, get_calculation_report_file
+from util.dir_utils import get_payment_root, \
+    get_calculations_root, get_successful_payments_dir, get_failed_payments_dir
 from util.process_life_cycle import ProcessLifeCycle
 
-NB_CONSUMERS = 1
 BUF_SIZE = 50
 payments_queue = queue.Queue(BUF_SIZE)
 logger = main_logger
-
-lifeCycle = ProcessLifeCycle()
-
-
+lifeCycle = None
 
 
 def main(config):
-    network_config = network_config_map[config.network]
-    key = config.key
+    nw_cfg_sel = network_config_map[config.network]
+    payment_addr_key = config.key
 
     dry_run = config.dry_run_no_payments or config.dry_run
     if config.dry_run_no_payments:
         global NB_CONSUMERS
         NB_CONSUMERS = 0
+
+    # Load business configuration and validate
+    buss_conf_manager = BusinessJsonConfigManager("business.json")
+    buss_conf_manager.load()
+    buss_conf_manager.validate()
+    buss_conf = buss_conf_manager.cfg
+
+    baking_address = buss_conf["baking_address"]
+    lifeCycle = ProcessLifeCycle()
+
+    logger.info("--------------------------------------------")
+    logger.info("Baking  Address is {}".format(baking_address))
+    logger.info("Payment Address is {}".format(config.key))
+    logger.info("--------------------------------------------")
 
     reports_dir = os.path.expanduser(config.reports_dir)
     # if in dry run mode, do not create consumers
@@ -50,38 +50,26 @@ def main(config):
     if dry_run:
         reports_dir = os.path.expanduser("./dry")
 
+    reports_dir = os.path.join(reports_dir, baking_address)
+
     payments_root = get_payment_root(reports_dir, create=True)
     calculations_root = get_calculations_root(reports_dir, create=True)
     get_successful_payments_dir(payments_root, create=True)
     get_failed_payments_dir(payments_root, create=True)
-
-    run_mode = RunMode(config.run_mode)
     node_addr = config.node_addr
-    payment_offset = config.payment_offset
 
-    client_path = get_client_path([x.strip() for x in config.executable_dirs.split(',')], config.docker, network_config,
-                                  config.verbose)
+    client_path = get_client_path(
+        [x.strip() for x in config.executable_dirs.split(',')], config.docker, nw_cfg_sel, config.verbose)
+
     logger.debug("Client command is {}".format(client_path))
 
-    validate_map_share_sum(founders_map, "founders map")
-    validate_map_share_sum(owners_map, "owners map")
+    lifeCycle.start(not (dry_run or config.no_lock_check))
 
-    lifeCycle.start(not dry_run)
+    # initialize fee calculator, fee calculator is used for baking service fee calculations
+    # not to be confused with network fee
+    service_fee_calc = ServiceFeeCalculator.from_dict(buss_conf)
 
-    global supporters_set
-    global excluded_delegators_set
-
-    if not supporters_set:  # empty sets are evaluated as dict
-        supporters_set = set()
-
-    if not excluded_delegators_set:  # empty sets are evaluated as dict
-        excluded_delegators_set = set()
-
-    full_supporters_set = supporters_set | set(founders_map.keys()) | set(owners_map.keys())
-
-    service_fee_calc = ServiceFeeCalculator(supporters_set=full_supporters_set, specials_map=specials_map,
-                                            standard_fee=STANDARD_FEE)
-
+    # if initial cycle is not given, determine initial cycle to start
     if config.initial_cycle is None:
         recent = None
         if get_successful_payments_dir(payments_root):
@@ -94,20 +82,16 @@ def main(config):
 
         logger.info("initial_cycle set to {}".format(config.initial_cycle))
 
-    p = ProducerThread(name='producer', initial_payment_cycle=config.initial_cycle, network_config=network_config,
-                       payments_dir=payments_root, calculations_dir=calculations_root, run_mode=run_mode,
-                       service_fee_calc=service_fee_calc, deposit_owners_map=owners_map,
-                       baker_founders_map=founders_map, baking_address=BAKING_ADDRESS, batch=config.batch,
-                       release_override=config.release_override, payment_offset=payment_offset,
-                       excluded_delegators_set=excluded_delegators_set, verbose=config.verbose)
-    p.start()
+    producer = ProducerThread(payments_queue, 'producer', service_fee_calc=service_fee_calc, execution_config=config,
+                              business_config=buss_conf, life_cycle=lifeCycle, verbose=config.verbose,
+                              calc_dir=calculations_root, paym_dir=payments_root)
+    producer.start()
 
-    for i in range(NB_CONSUMERS):
-        c = PaymentConsumer(name='consumer' + str(i), payments_dir=payments_root, key_name=key,
-                            client_path=client_path, payments_queue=payments_queue, node_addr=node_addr,
-                            verbose=config.verbose, dry_run=dry_run)
-        time.sleep(1)
-        c.start()
+    consumer = PaymentConsumer(name='consumer', payments_dir=payments_root, key_name=payment_addr_key,
+                               client_path=client_path, payments_queue=payments_queue, node_addr=node_addr,
+                               verbose=config.verbose, dry_run=dry_run)
+    consumer.start()
+
     try:
         while lifeCycle.is_running(): time.sleep(10)
     except KeyboardInterrupt:
@@ -124,16 +108,15 @@ if __name__ == '__main__':
     parser.add_argument("key", help="tezos address or alias to make payments")
     parser.add_argument("-N", "--network", help="network name", choices=['ZERONET', 'ALPHANET', 'MAINNET'],
                         default='MAINNET')
-    parser.add_argument("-r", "--reports_dir", help="Directory to create reports", default='./reports')
+    parser.add_argument("-r", "--reports_dir", help="Directory to create reports", default='~/tezos-payments-reports')
     parser.add_argument("-A", "--node_addr", help="Node host:port pair", default='127.0.0.1:8732')
+    parser.add_argument("--no-lock-check", help="Do not check for lock file. Only suitable for testing. Use with care.",
+                        action="store_true")
     parser.add_argument("-D", "--dry_run",
                         help="Run without injecting payments. Suitable for testing. Does not require locking.",
                         action="store_true")
     parser.add_argument("-Dn", "--dry_run_no_payments",
                         help="Run without doing any payments. Suitable for testing. Does not require locking.",
-                        action="store_true")
-    parser.add_argument("-B", "--batch",
-                        help="Make batch payments.",
                         action="store_true")
     parser.add_argument("-E", "--executable_dirs",
                         help="Comma separated list of directories to search for client executable. Prefer single "
@@ -170,14 +153,8 @@ if __name__ == '__main__':
 
     logger.info("Tezos Reward Distributor is Starting")
     logger.info("Current network is {}".format(args.network))
-    logger.info("Baker address is {}".format(BAKING_ADDRESS))
-    logger.info("Key name {}".format(args.key))
-    logger.info("--------------------------------------------")
-    logger.info("Copyright Hüseyin ABANOZ 2018")
-    logger.info("huseyinabanox@gmail.com")
-    logger.info("Please leave copyright information")
     logger.info("--------------------------------------------")
     if args.dry_run:
         logger.info("DRY RUN MODE")
-        logger.info("--------------------------------------------")
+        logger.info("***************************************")
     main(args)

@@ -1,7 +1,5 @@
 import json
 import os
-from BusinessConfiguration import founders_map, owners_map, supporters_set, BAKING_ADDRESS, STANDARD_FEE, specials_map
-from BusinessConfigurationX import excluded_delegators_set
 from config.config_manger import STANDARD_FEE_KEY, SPECIALS_MAP_KEY, FOUNDERS_MAP_KEY, SUPPORTERS_KEY, \
     EXCLUDED_DELEGATORS_KEY, OWNERS_MAP_KEY
 from config.json_config_manager import JsonConfigManager
@@ -18,10 +16,10 @@ class BusinessJsonConfigManager(JsonConfigManager):
         logger.warn("Business config file '{}' is not present. Generating it from BusinessConfig.py "
                     .format(self.config_file))
 
-        business_config_dict = {"baking_address": BAKING_ADDRESS, FOUNDERS_MAP_KEY: founders_map,
-                                STANDARD_FEE_KEY: STANDARD_FEE, SPECIALS_MAP_KEY: specials_map,
-                                OWNERS_MAP_KEY: owners_map, SUPPORTERS_KEY: list(supporters_set),
-                                EXCLUDED_DELEGATORS_KEY: list(excluded_delegators_set)}
+        business_config_dict = {"baking_address": "{}","paying_address": "{}", FOUNDERS_MAP_KEY: "{}",
+                                STANDARD_FEE_KEY: "0.50", SPECIALS_MAP_KEY: "{}",
+                                OWNERS_MAP_KEY: "{}", SUPPORTERS_KEY: "{}",
+                                EXCLUDED_DELEGATORS_KEY: "{}"}
 
         with open(self.config_file, "wt") as json_config:
             json.dump(business_config_dict, json_config)

@@ -47,14 +47,15 @@ class BatchPayer():
         self.storage_limit = kttx['storage_limit']
         self.default_fee = kttx['fee']
 
+        self.known_contracts = None
+
         # key_name has a length of 36 and starts with tz or KT then it is a public key has, else it is an alias
         if len(self.key_name) == PKH_LENGHT and (self.key_name.startswith("KT") or self.key_name.startswith("tz")):
             self.source = self.key_name
         else:
-            known_contracts = client_list_known_contracts(self.client_path)
-            if self.key_name in known_contracts:
-                self.source = known_contracts[self.key_name]
-            else:
+            try:
+                self.source = self.get_known_cntrct_addr(self.key_name)
+            except:
                 raise Exception("key_name cannot be translated into a PKH or alias: {}".format(self.key_name))
 
         self.comm_head = COMM_HEAD.format(self.client_path, self.node_url)
@@ -64,6 +65,11 @@ class BatchPayer():
         self.comm_preapply = COMM_PREAPPLY.format(self.client_path).replace("%NODE%", self.node_url)
         self.comm_inject = COMM_INJECT.format(self.client_path).replace("%NODE%", self.node_url)
         self.comm_wait = COMM_WAIT.format(self.client_path)
+
+    def get_known_cntrct_addr(self, alias):
+        if not self.known_contracts:
+            self.known_contracts = client_list_known_contracts(self.client_path)
+        return self.known_contracts[alias]
 
     def pay(self, payment_items, verbose=None, dry_run=None):
         # split payments into lists of MAX_TX_PER_BLOCK or less size
@@ -194,10 +200,10 @@ class BatchPayer():
         logger.debug("Injecting {} operations".format(len(content_list)))
         decoded = base58.b58decode(signed_bytes).hex()
 
-        if signed_bytes.startswith("edsig"):# edsig signature
+        if signed_bytes.startswith("edsig"):  # edsig signature
             decoded_edsig_signature = decoded[10:][:-8]  # first 5 bytes edsig, last 4 bytes checksum
             decoded_signature = decoded_edsig_signature
-        elif signed_bytes.startswith("sig"): # generic signature
+        elif signed_bytes.startswith("sig"):  # generic signature
             decoded_sig_signature = decoded[6:][:-8]  # first 3 bytes sig, last 4 bytes checksum
             decoded_signature = decoded_sig_signature
         else:

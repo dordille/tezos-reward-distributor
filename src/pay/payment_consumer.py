@@ -84,7 +84,7 @@ class PaymentConsumer(threading.Thread):
                     self.mm.send_payment_mail(pymnt_cycle, report_file, nb_failed)
 
             except Exception as e:
-                logger.error("Error at reward payment", e)
+                logger.error("Error at reward payment", exc_info=True)
 
         logger.info("Consumer returning ...")
 

@@ -8,7 +8,7 @@ ONE_MILLION = 1000000
 
 class TzScanRewardCalculatorApi(RewardCalculatorApi):
     # reward_data : payment map returned from tzscan
-    def __init__(self, founders_map, reward_data, excluded_set):
+    def __init__(self, reward_data, founders_map, excluded_set):
         super(TzScanRewardCalculatorApi, self).__init__(founders_map, excluded_set)
         self.reward_data = reward_data
 
