@@ -7,6 +7,7 @@ import time
 from NetworkConfiguration import network_config_map
 from calc.service_fee_calculator import ServiceFeeCalculator
 from config.business_json_config_manager import BusinessJsonConfigManager
+from config.config_manger import PAYING_ADDRESS_KEY, BAKING_ADDRESS_KEY
 from log_config import main_logger
 from pay.payment_consumer import PaymentConsumer
 from pay.regular_payment_producer import ProducerThread
@@ -23,12 +24,11 @@ lifeCycle = None
 
 def main(config):
     nw_cfg_sel = network_config_map[config.network]
-    payment_addr_key = config.key
 
     dry_run = config.dry_run_no_payments or config.dry_run
+    dry_run_no_payer = False
     if config.dry_run_no_payments:
-        global NB_CONSUMERS
-        NB_CONSUMERS = 0
+        dry_run_no_payer = True
 
     # Load business configuration and validate
     buss_conf_manager = BusinessJsonConfigManager("business.json")
@@ -36,12 +36,13 @@ def main(config):
     buss_conf_manager.validate()
     buss_conf = buss_conf_manager.cfg
 
-    baking_address = buss_conf["baking_address"]
+    baking_address = buss_conf[BAKING_ADDRESS_KEY]
+    payment_address = buss_conf[PAYING_ADDRESS_KEY]
     lifeCycle = ProcessLifeCycle()
 
     logger.info("--------------------------------------------")
     logger.info("Baking  Address is {}".format(baking_address))
-    logger.info("Payment Address is {}".format(config.key))
+    logger.info("Payment Address is {}".format(payment_address))
     logger.info("--------------------------------------------")
 
     reports_dir = os.path.expanduser(config.reports_dir)
@@ -87,10 +88,11 @@ def main(config):
                               calc_dir=calculations_root, paym_dir=payments_root)
     producer.start()
 
-    consumer = PaymentConsumer(name='consumer', payments_dir=payments_root, key_name=payment_addr_key,
-                               client_path=client_path, payments_queue=payments_queue, node_addr=node_addr,
-                               verbose=config.verbose, dry_run=dry_run)
-    consumer.start()
+    if not dry_run_no_payer:
+        consumer = PaymentConsumer(name='consumer', payments_dir=payments_root, key_name=payment_address,
+                                   client_path=client_path, payments_queue=payments_queue, node_addr=node_addr,
+                                   verbose=config.verbose, dry_run=dry_run)
+        consumer.start()
 
     try:
         while lifeCycle.is_running(): time.sleep(10)
@@ -105,7 +107,6 @@ if __name__ == '__main__':
         raise Exception("Must be using Python 3")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("key", help="tezos address or alias to make payments")
     parser.add_argument("-N", "--network", help="network name", choices=['ZERONET', 'ALPHANET', 'MAINNET'],
                         default='MAINNET')
     parser.add_argument("-r", "--reports_dir", help="Directory to create reports", default='~/tezos-payments-reports')

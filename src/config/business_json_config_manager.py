@@ -1,7 +1,7 @@
 import json
 import os
 from config.config_manger import STANDARD_FEE_KEY, SPECIALS_MAP_KEY, FOUNDERS_MAP_KEY, SUPPORTERS_KEY, \
-    EXCLUDED_DELEGATORS_KEY, OWNERS_MAP_KEY
+    EXCLUDED_DELEGATORS_KEY, OWNERS_MAP_KEY, MIN_DELEGATION_KEY
 from config.json_config_manager import JsonConfigManager
 from log_config import main_logger
 
@@ -17,7 +17,7 @@ class BusinessJsonConfigManager(JsonConfigManager):
                     .format(self.config_file))
 
         business_config_dict = {"baking_address": "{}","paying_address": "{}", FOUNDERS_MAP_KEY: "{}",
-                                STANDARD_FEE_KEY: "0.50", SPECIALS_MAP_KEY: "{}",
+                                STANDARD_FEE_KEY: "5",MIN_DELEGATION_KEY: "10", SPECIALS_MAP_KEY: "{}",
                                 OWNERS_MAP_KEY: "{}", SUPPORTERS_KEY: "{}",
                                 EXCLUDED_DELEGATORS_KEY: "{}"}
 
@@ -60,8 +60,8 @@ class BusinessJsonConfigManager(JsonConfigManager):
 
 # all shares in the map must sum up to 1
 def validate_map_share_sum(config, map_name):
-    if abs(1 - sum(config[map_name].values()) > 1e-4):  # a zero check actually
-        raise Exception("Map '{}' shares does not sum up to 1!".format(map_name))
+    if abs(100 - sum(config[map_name].values()) > 1e-4):  # a zero check actually
+        raise Exception("Map '{}' shares does not sum up to 100!".format(map_name))
 
 
 def test_business_json_config_manager():

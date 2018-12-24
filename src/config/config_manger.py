@@ -1,8 +1,10 @@
 
 from abc import ABC, abstractmethod
 
-BAKING_ADDRESS_KEY = "BAKING_ADDRESS"
-STANDARD_FEE_KEY = "standard_baking_fee"
+BAKING_ADDRESS_KEY = "baking_address"
+PAYING_ADDRESS_KEY = "paying_address"
+STANDARD_FEE_KEY = "baking_fee"
+MIN_DELEGATION_KEY = "min_delegation_amount"
 FOUNDERS_MAP_KEY = "founders_map"
 SPECIALS_MAP_KEY = "specials_map"
 SUPPORTERS_KEY = "supporters"
