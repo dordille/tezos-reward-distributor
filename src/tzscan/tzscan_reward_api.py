@@ -1,7 +1,4 @@
 import random
-from math import ceil
-
-import math
 import requests
 
 import NetworkConfiguration

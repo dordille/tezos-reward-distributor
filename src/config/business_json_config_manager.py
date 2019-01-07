@@ -45,7 +45,7 @@ class BusinessJsonConfigManager(JsonConfigManager):
             self.cfg[EXCLUDED_DELEGATORS_KEY] = []
 
         # Merge all supporters. Use set objects to avoid duplicates.
-        self.cfg["supporters"] = list(set(self.cfg[SUPPORTERS_KEY]) |
+        self.cfg[SUPPORTERS_KEY] = list(set(self.cfg[SUPPORTERS_KEY]) |
                                       set(self.cfg[FOUNDERS_MAP_KEY].keys()) |
                                       set(self.cfg[OWNERS_MAP_KEY].keys())
                                       )
@@ -54,14 +54,27 @@ class BusinessJsonConfigManager(JsonConfigManager):
         if not self.cfg:
             raise Exception("Configuration is not loaded. Run load first.")
 
-        validate_map_share_sum(self.cfg, "founders_map")
-        validate_map_share_sum(self.cfg, "owners_map")
+        if self.cfg[STANDARD_FEE_KEY] < 1:
+            raise Exception("Standard Fee must be in range of 1-100")
 
+        # convert fee which is in 1-100 range into 0-1 range
+        self.cfg[STANDARD_FEE_KEY] = self.cfg[STANDARD_FEE_KEY] / 100.0
+
+        validate_map_share_sum(self.cfg, FOUNDERS_MAP_KEY)
+        validate_map_share_sum(self.cfg, OWNERS_MAP_KEY)
+
+        move_to_01_range(self.cfg, FOUNDERS_MAP_KEY)
+        move_to_01_range(self.cfg, OWNERS_MAP_KEY)
 
 # all shares in the map must sum up to 1
 def validate_map_share_sum(config, map_name):
     if abs(100 - sum(config[map_name].values()) > 1e-4):  # a zero check actually
         raise Exception("Map '{}' shares does not sum up to 100!".format(map_name))
+
+def move_to_01_range(config, map_name):
+    map = config[map_name]
+    for k in map.keys():
+        map[k]=map[k]/100
 
 
 def test_business_json_config_manager():
