@@ -16,7 +16,7 @@ With V4 TRD can use tezos node to make calculations. This way, dependency on tzs
 DISCLAIMER : TEZOS REWARD DISTRIBUTOR IS PROVIDED AS IS. IT IS UNDER CONSTANT DEVELOPMENT. EVENT THOUGH IT IS WELL TESTED, PLEASE USE WITH CARE. ALWAYS MAKE A PRE-RUN IN DRY MODE BEFORE MAKING ACTUAL PAYMENTS. IF YOU WANT TO RUN IN SERVICE MODE DO IT AFTER YOU ARE CONFIDENT WITH THE APPLICATION AND IN SERVICE MODE DO NOT UPDATE OFTEN.
 
 
-### ![alt text](https://raw.githubusercontent.com/habanoz/trd-art/master/logo/trd_512__1.png) Tezos Reward Distributor
+### ![](https://raw.githubusercontent.com/habanoz/trd-art/master/logo/trd_512__1.png | width=100) Tezos Reward Distributor
 
 A software for distributing baking rewards with delegators. This is not a script but service which can run in the background all the time. It can track cycles and make payments. It does not have to be used as a service, It can also be used interactively. 
 
