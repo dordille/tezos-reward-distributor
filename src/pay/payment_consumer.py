@@ -150,18 +150,16 @@ class PaymentConsumer(threading.Thread):
                 logger.info("Payment done for address %s type %s amount {:>8.2f} paid %s".format(pl.amount / MUTEZ),
                             pl.address, pl.type, pl.paid)
 
-        if self.publish_stats and not self.dry_run:
-            n_f_type = len([pl for pl in payment_logs if pl.type == TYPE_FOUNDER] + [p for pl in payment_logs if
-                                                                                     pl.type == TYPE_MERGED for p in
-                                                                                     pl.parents if
-                                                                                     p.type == TYPE_FOUNDER])
-            n_o_type = len([pl for pl in payment_logs if pl.type == TYPE_OWNER] + [p for pl in payment_logs if
-                                                                                   pl.type == TYPE_MERGED for p in
-                                                                                   pl.parents if p.type == TYPE_OWNER])
-            n_d_type = len([pl for pl in payment_logs if pl.type == TYPE_DELEGATOR] + [p for pl in payment_logs if
-                                                                                       pl.type == TYPE_MERGED for p in
-                                                                                       pl.parents if
-                                                                                       p.type == TYPE_DELEGATOR])
+        if self.publish_stats and not self.dry_run and (not self.args or self.args.network == 'MAINNET'):
+            n_f_type = len([pl for pl in payment_logs if pl.type == TYPE_FOUNDER] +
+                           [p for pl in payment_logs if pl.type == TYPE_MERGED for p in pl.parents if
+                            p.type == TYPE_FOUNDER])
+            n_o_type = len([pl for pl in payment_logs if pl.type == TYPE_OWNER] +
+                           [p for pl in payment_logs if pl.type == TYPE_MERGED for p in pl.parents if
+                            p.type == TYPE_OWNER])
+            n_d_type = len([pl for pl in payment_logs if pl.type == TYPE_DELEGATOR] +
+                           [p for pl in payment_logs if pl.type == TYPE_MERGED for p in pl.parents if
+                            p.type == TYPE_DELEGATOR])
             n_m_type = len([pl for pl in payment_logs if pl.type == TYPE_MERGED])
 
             stats_dict = {}
@@ -176,6 +174,7 @@ class PaymentConsumer(threading.Thread):
             stats_dict['cycle'] = payment_cycle
             stats_dict['m_fee'] = 1 if self.delegator_pays_xfer_fee else 0
             stats_dict['trdver'] = version.version
+            stats_dict['tzone'] = time.timezone / -(60 * 60)  # e.g. +3
 
             if self.args:
                 stats_dict['m_run'] = 1 if self.args.background_service else 0
@@ -186,7 +185,10 @@ class PaymentConsumer(threading.Thread):
                 elif self.args.release_override < 0:
                     m_relov = -1
                 stats_dict['m_relov'] = m_relov
+                stats_dict['m_offset'] = 1 if self.args.payment_offset != 0 else 0
+                stats_dict['m_clnt'] = 1 if self.args.docker else 0
 
+            # publish
             stat_publish(stats_dict)
 
         return report_file

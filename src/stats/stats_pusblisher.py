@@ -1,6 +1,5 @@
 import json
 import threading
-import time
 from time import sleep
 
 import requests
@@ -11,8 +10,6 @@ headers = {'content-type': 'application/json'}
 
 
 def stat_publish(stats_map):
-    stats_map['tzone'] = time.timezone / -(60 * 60)  # e.g. +3
-
     t = threading.Thread(target=stat_publish_job, name="stat_publish_job", args=({'stats':stats_map},))
     t.daemon = True
     t.start()
