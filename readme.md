@@ -7,8 +7,10 @@ V5 is available under pphases branch. It will be merged to master in coming days
 - Enhanced calculation steps aka phases
 - Ability to exclude owners or founders
 - Payment to custom address
-- Merging of multiple payments towars an address into single payment
+- Merging of multiple payments towards an address into single payment
 - Ability to choose where rewards of excluded or min delegated accounts go: share among other delegators, send to founders, do nothing e.g. leave in balance.
+
+Check license and notice.txt files for more information. 
 
 ## V4 Announcement
 With V4 TRD can use tezos node to make calculations. This way, dependency on tzscan is relieved.

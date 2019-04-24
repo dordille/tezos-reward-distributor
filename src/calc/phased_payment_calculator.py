@@ -21,6 +21,7 @@ class PhasedPaymentCalculator:
     -- Phase3 : Founders Phase
     -- Phase4 : Split Phase
     -- Phase5 : Mapping Phase
+    -- Phase6 : Merge Phase --
     -- Phase Last : Payment Phase
     """
 
