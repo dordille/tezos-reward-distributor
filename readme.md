@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/habanoz/trd-art/master/logo-narrow/trd_512__1.png" width="128" /> 
+
 ## V5 Announcement
 
 V5 is available under pphases branch. It will be merged to master in coming days. Feel free to test it. New version comes with following improvements:
@@ -11,12 +13,12 @@ V5 is available under pphases branch. It will be merged to master in coming days
 ## V4 Announcement
 With V4 TRD can use tezos node to make calculations. This way, dependency on tzscan is relieved.
 
-## Tezos Reward Distributor : Run & Forget
+## Tezos Reward Distributor : Run & Forget 
 
 DISCLAIMER : TEZOS REWARD DISTRIBUTOR IS PROVIDED AS IS. IT IS UNDER CONSTANT DEVELOPMENT. EVENT THOUGH IT IS WELL TESTED, PLEASE USE WITH CARE. ALWAYS MAKE A PRE-RUN IN DRY MODE BEFORE MAKING ACTUAL PAYMENTS. IF YOU WANT TO RUN IN SERVICE MODE DO IT AFTER YOU ARE CONFIDENT WITH THE APPLICATION AND IN SERVICE MODE DO NOT UPDATE OFTEN.
 
 
-### Tezos Reward Distributor
+## Tezos Reward Distributor
 
 A software for distributing baking rewards with delegators. This is not a script but service which can run in the background all the time. It can track cycles and make payments. It does not have to be used as a service, It can also be used interactively. 
 
