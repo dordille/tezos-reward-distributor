@@ -163,8 +163,8 @@ class PaymentConsumer(threading.Thread):
             n_m_type = len([pl for pl in payment_logs if pl.type == TYPE_MERGED])
 
             stats_dict = {}
-            stats_dict['tot_amnt'] = sum([rl.amount for rl in payment_logs])
-            stats_dict['nb_pay'] = len(payment_logs)
+            stats_dict['tot_amnt'] = int(sum([rl.amount for rl in payment_logs])/1e+9) # in 1K tezos
+            stats_dict['nb_pay'] = int(len(payment_logs)/10)
             stats_dict['nb_failed'] = nb_failed
             stats_dict['tot_attmpt'] = total_attempts
             stats_dict['nb_f'] = n_f_type
