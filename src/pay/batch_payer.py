@@ -20,7 +20,7 @@ COMM_FORGE = " rpc post http://%NODE%/chains/main/blocks/head/helpers/forge/oper
 COMM_RUNOPS = " rpc post http://%NODE%/chains/main/blocks/head/helpers/scripts/run_operation with '%JSON%'"
 COMM_PREAPPLY = " rpc post http://%NODE%/chains/main/blocks/head/helpers/preapply/operations with '%JSON%'"
 COMM_INJECT = " %LOG% rpc post http://%NODE%/injection/operation with '\"%OPERATION_HASH%\"'"
-COMM_WAIT = " wait for %OPERATION% to be included ---confirmations 5"
+COMM_WAIT = " wait for %OPERATION% to be included --confirmations 1"
 MAX_TX_PER_BLOCK = 280
 PKH_LENGHT = 36
 
@@ -100,16 +100,19 @@ class BatchPayer():
         total_attempts = 0
 
         payment_logs = []
+        op_counter = OpCounter()
+        logger.debug("Payment will be done in {} batches".format(len(payment_items_chunks)))
         for payment_items_chunk in payment_items_chunks:
             logger.debug("Payment of a batch started")
-            payments_log, attempt = self.pay_single_batch_wrap(payment_items_chunk, verbose=verbose, dry_run=dry_run)
+            payments_log = \
+                self.pay_single_batch_wrap(payment_items_chunk, verbose=verbose, dry_run=dry_run, op_counter=op_counter)
             payment_logs.extend(payments_log)
             total_attempts += attempt
             logger.debug("Payment of a batch is complete")
 
         return payment_logs, total_attempts
 
-    def pay_single_batch_wrap(self, payment_items, verbose=None, dry_run=None):
+    def pay_single_batch_wrap(self, payment_items, op_counter, verbose=None, dry_run=None):
 
         max_try = 3
         return_code = False
@@ -121,10 +124,16 @@ class BatchPayer():
         # trying after some time should be OK
         for attempt in range(max_try):
             attempt_count += 1
-            return_code, operation_hash = self.pay_single_batch(payment_items, verbose, dry_run=dry_run)
+           return_code, operation_hash = \
+                self.pay_single_batch(payment_items, op_counter, verbose, dry_run=dry_run)
+            if dry_run or not return_code:
+                op_counter.rollback()
+            else:
+                op_counter.commit()
 
             # if successful, do not try anymore
-            if return_code: break
+            if return_code:
+                break
 
             logger.debug("Batch payment attempt {} failed".format(attempt))
 
@@ -143,15 +152,17 @@ class BatchPayer():
         logger.debug("Wait for {} seconds before trying again".format(slp_tm))
         sleep(slp_tm)
 
-    def pay_single_batch(self, payment_records, verbose=None, dry_run=None):
-        counter = parse_json_response(self.wllt_clnt_mngr.send_request(self.comm_counter))
-        counter = int(counter)
+    def pay_single_batch(self, payment_records, op_counter, verbose=None, dry_run=None):
+        if not op_counter.get():
+            counter = parse_json_response(self.wllt_clnt_mngr.send_request(self.comm_counter))
+            counter = int(counter)
+            op_counter.set(counter)
 
         head = parse_json_response(self.wllt_clnt_mngr.send_request(self.comm_head, verbose_override=False))
         branch = head["hash"]
         protocol = head["metadata"]["protocol"]
 
-        logger.debug("head: branch {} counter {} protocol {}".format(branch, counter, protocol))
+        logger.debug("head: branch {} counter {} protocol {}".format(branch, op_counter.get(), protocol))
 
         content_list = []
 
@@ -164,9 +175,9 @@ class BatchPayer():
             if pymnt_amnt < 1e-3:  # zero check
                 continue
 
-            counter = counter + 1
+            op_counter.inc()
             content = CONTENT.replace("%SOURCE%", self.source).replace("%DESTINATION%", payment_item.address) \
-                .replace("%AMOUNT%", str(pymnt_amnt)).replace("%COUNTER%", str(counter)) \
+                .replace("%AMOUNT%", str(pymnt_amnt)).replace("%COUNTER%", str(op_counter.get())) \
                 .replace("%fee%", self.default_fee).replace("%gas_limit%", self.gas_limit).replace("%storage_limit%",
                                                                                                    self.storage_limit)
             content_list.append(content)
@@ -258,3 +269,30 @@ class BatchPayer():
         logger.debug("Operation {} is included".format(operation_hash))
 
         return True, operation_hash
+
+
+class OpCounter:
+    def __init__(self) -> None:
+        super().__init__()
+        self.__counter = None
+        self.__counter_backup = None
+
+    def inc(self):
+        if self.__counter is None:
+            raise Exception("Counter is not set!!!")
+
+        self.__counter += 1
+
+    def get(self):
+        return self.__counter
+
+    def commit(self):
+        self.__counter_backup = self.__counter
+
+    def rollback(self):
+        self.__counter = self.__counter_backup
+
+    def set(self, counter):
+        self.__counter = counter
+        self.__counter_backup = counter
+
