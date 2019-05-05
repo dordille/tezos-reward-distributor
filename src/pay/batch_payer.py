@@ -114,13 +114,13 @@ class BatchPayer():
         payment_logs = []
         op_counter = OpCounter()
         logger.debug("Payment will be done in {} batches".format(len(payment_items_chunks)))
-        for payment_items_chunk in payment_items_chunks:
-            logger.debug("Payment of a batch started")
+        for i_batch, payment_items_chunk in enumerate(payment_items_chunks):
+            logger.debug("Payment of batch {} started".format(i_batch))
             payments_log, attempt = self.pay_single_batch_wrap(payment_items_chunk, verbose=verbose, dry_run=dry_run,
                                                                op_counter=op_counter)
             payment_logs.extend(payments_log)
             total_attempts += attempt
-            logger.debug("Payment of a batch is complete")
+            logger.debug("Payment of batch {} is complete".format(i_batch))
 
         return payment_logs, total_attempts
 
@@ -205,22 +205,26 @@ class BatchPayer():
         logger.debug("Running {} operations".format(len(content_list)))
         runops_json = RUNOPS_JSON.replace('%BRANCH%', branch).replace("%CONTENT%", contents_string)
         runops_command_str = self.comm_runops.replace("%JSON%", runops_json)
-        if verbose: logger.debug("runops_command_str is |{}|".format(runops_command_str))
+        if verbose: print("--> runops_command_str is |{}|".format(runops_command_str))
         runops_command_response = self.wllt_clnt_mngr.send_request(runops_command_str)
         if not check_response(runops_command_response):
-            logger.error("Error in run_operation, request ->{}<-".format(runops_command_str))
-            logger.error("Error in run_operation, response ->{}<-".format(runops_command_response))
+            logger.error("Error in run_operation")
+            logger.debug("Error in run_operation, request ->{}<-".format(runops_command_str))
+            logger.debug("---")
+            logger.debug("Error in run_operation, response ->{}<-".format(runops_command_response))
             return False, ""
 
         # forge the operations
         logger.debug("Forging {} operations".format(len(content_list)))
         forge_json = FORGE_JSON.replace('%BRANCH%', branch).replace("%CONTENT%", contents_string)
         forge_command_str = self.comm_forge.replace("%JSON%", forge_json)
-        if verbose: logger.debug("forge_command_str is |{}|".format(forge_command_str))
+        if verbose: print("--> forge_command_str is |{}|".format(forge_command_str))
         forge_command_response = self.wllt_clnt_mngr.send_request(forge_command_str)
         if not check_response(forge_command_response):
-            logger.error("Error in forge, request '{}'".format(forge_command_str))
-            logger.error("Error in forge, response '{}'".format(forge_command_response))
+            logger.error("Error in forge operation")
+            logger.debug("Error in forge, request '{}'".format(forge_command_str))
+            logger.debug("---")
+            logger.debug("Error in forge, response '{}'".format(forge_command_response))
             return False, ""
 
         # sign the operations
@@ -233,11 +237,13 @@ class BatchPayer():
             "%PROTOCOL%", protocol).replace("%SIGNATURE%", signed_bytes)
         preapply_command_str = self.comm_preapply.replace("%JSON%", preapply_json)
 
-        if verbose: logger.debug("preapply_command_str is |{}|".format(preapply_command_str))
+        if verbose: print("--> preapply_command_str is |{}|".format(preapply_command_str))
         preapply_command_response = self.wllt_clnt_mngr.send_request(preapply_command_str)
         if not check_response(preapply_command_response):
-            logger.error("Error in preapply, request '{}'".format(preapply_command_str))
-            logger.error("Error in preapply, response '{}'".format(preapply_command_response))
+            logger.error("Error in forge operation")
+            logger.debug("Error in preapply, request '{}'".format(preapply_command_str))
+            logger.debug("---")
+            logger.debug("Error in preapply, response '{}'".format(preapply_command_response))
             return False, ""
 
         # not necessary
@@ -267,11 +273,13 @@ class BatchPayer():
 
         signed_operation_bytes = bytes + decoded_signature
         inject_command_str = self.comm_inject.replace("%OPERATION_HASH%", signed_operation_bytes)
-        if verbose: logger.debug("inject_command_str is |{}|".format(inject_command_str))
+        if verbose: print("--> inject_command_str is |{}|".format(inject_command_str))
         inject_command_response = self.wllt_clnt_mngr.send_request(inject_command_str)
         if not check_response(inject_command_response):
-            logger.error("Error in inject, response '{}'".format(inject_command_str))
-            logger.error("Error in inject, response '{}'".format(inject_command_response))
+            logger.error("Error in inject operation")
+            logger.debug("Error in inject, response '{}'".format(inject_command_str))
+            logger.debug("---")
+            logger.debug("Error in inject, response '{}'".format(inject_command_response))
             return False, ""
 
         operation_hash = parse_json_response(inject_command_response)
