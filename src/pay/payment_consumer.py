@@ -52,7 +52,7 @@ class PaymentConsumer(threading.Thread):
         self.publish_stats = publish_stats
         self.args = args
 
-        logger.debug('Consumer "%s" created', self.name)
+        logger.info('Consumer "%s" created', self.name)
 
         return
 
@@ -67,7 +67,7 @@ class PaymentConsumer(threading.Thread):
                     continue
 
                 if payment_items[0].type == EXIT_PAYMENT_TYPE:
-                    logger.debug("Exit signal received. Killing the thread...")
+                    logger.warn("Exit signal received. Killing the thread...")
                     break
 
                 # each log in the batch belongs to the same cycle
@@ -151,7 +151,7 @@ class PaymentConsumer(threading.Thread):
                             [ppl.address, ppl.type, ppl.amount, pl.hash if pl.hash else "None", "1" if pl.paid else "0",
                              pl.address])
 
-                logger.info("Payment done for address %s type %s amount {:>8.2f} paid %s".format(pl.amount / MUTEZ),
+                logger.debug("Payment done for address %s type %s amount {:>8.2f} paid %s".format(pl.amount / MUTEZ),
                             pl.address, pl.type, pl.paid)
 
         if self.publish_stats and not self.dry_run and (not self.args or self.args.network == 'MAINNET'):
@@ -178,7 +178,6 @@ class PaymentConsumer(threading.Thread):
             stats_dict['cycle'] = payment_cycle
             stats_dict['m_fee'] = 1 if self.delegator_pays_xfer_fee else 0
             stats_dict['trdver'] = version.version
-            stats_dict['tzone'] = time.timezone / -(60 * 60)  # e.g. +3
 
             if self.args:
                 stats_dict['m_run'] = 1 if self.args.background_service else 0
