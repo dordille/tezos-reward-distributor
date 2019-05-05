@@ -189,12 +189,12 @@ class PaymentProducer(threading.Thread):
                 # 6- create calculations report file. This file contains calculations details
                 self.create_calculations_report(payment_cycle, reward_logs, report_file_path,
                                                 total_amount)
+                # 7- next cycle
+                # processing of cycle is done
+                logger.info("Reward creation is done for cycle {}, {} payments.".format(payment_cycle, len(reward_logs)))
+
             elif total_amount_to_pay == 0:
                 logger.info("Total payment amount is 0. Nothing to pay!")
-
-            # 7- next cycle
-            # processing of cycle is done
-            logger.info("Reward creation is done for cycle %s.", payment_cycle)
 
             return True
 

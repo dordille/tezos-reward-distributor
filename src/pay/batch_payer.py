@@ -118,9 +118,12 @@ class BatchPayer():
             logger.debug("Payment of batch {} started".format(i_batch))
             payments_log, attempt = self.pay_single_batch_wrap(payment_items_chunk, verbose=verbose, dry_run=dry_run,
                                                                op_counter=op_counter)
+
+            logger.info("Payment of batch {} is complete, in {} attempts".format(i_batch, attempt))
+            
             payment_logs.extend(payments_log)
             total_attempts += attempt
-            logger.debug("Payment of batch {} is complete".format(i_batch))
+
 
         return payment_logs, total_attempts
 
@@ -240,7 +243,7 @@ class BatchPayer():
         if verbose: print("--> preapply_command_str is |{}|".format(preapply_command_str))
         preapply_command_response = self.wllt_clnt_mngr.send_request(preapply_command_str)
         if not check_response(preapply_command_response):
-            logger.error("Error in forge operation")
+            logger.error("Error in preapply operation")
             logger.debug("Error in preapply, request '{}'".format(preapply_command_str))
             logger.debug("---")
             logger.debug("Error in preapply, response '{}'".format(preapply_command_response))
