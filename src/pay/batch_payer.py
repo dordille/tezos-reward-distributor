@@ -116,8 +116,8 @@ class BatchPayer():
         logger.debug("Payment will be done in {} batches".format(len(payment_items_chunks)))
         for payment_items_chunk in payment_items_chunks:
             logger.debug("Payment of a batch started")
-            payments_log = \
-                self.pay_single_batch_wrap(payment_items_chunk, verbose=verbose, dry_run=dry_run, op_counter=op_counter)
+            payments_log, attempt = self.pay_single_batch_wrap(payment_items_chunk, verbose=verbose, dry_run=dry_run,
+                                                               op_counter=op_counter)
             payment_logs.extend(payments_log)
             total_attempts += attempt
             logger.debug("Payment of a batch is complete")
@@ -135,8 +135,7 @@ class BatchPayer():
         # due to unknown reasons, some times a batch fails to pre-apply
         # trying after some time should be OK
         for attempt in range(max_try):
-            return_code, operation_hash = \
-                self.pay_single_batch(payment_items, op_counter, verbose, dry_run=dry_run)
+            return_code, operation_hash = self.pay_single_batch(payment_items, op_counter, verbose, dry_run=dry_run)
 
             if dry_run or not return_code:
                 op_counter.rollback()
