@@ -2,6 +2,7 @@ from api.reward_api import RewardApi
 
 from log_config import main_logger
 from model.reward_provider_model import RewardProviderModel
+from tzscan.mirror_selection_helper import TzScanMirrorSelector
 from util.rpc_utils import parse_json_response
 from tzscan.tzscan_reward_api import TzScanRewardApiImpl
 
@@ -29,19 +30,19 @@ class RpcRewardApiImpl(RewardApi):
 
         self.validate = validate
         if self.validate:
-            self.validate_api = TzScanRewardApiImpl(nw, self.baking_address)
-
+            mirror_selector = TzScanMirrorSelector(nw)
+            self.validate_api = TzScanRewardApiImpl(nw, self.baking_address, mirror_selector)
 
     def get_nb_delegators(self, cycle, verbose=False):
         _, delegators = self.__get_delegators_and_delgators_balance(cycle)
         return len(delegators)
 
-
     def get_rewards_for_cycle_map(self, cycle, verbose=False):
 
         reward_data = {}
 
-        reward_data["delegate_staking_balance"], reward_data["delegators"] = self.__get_delegators_and_delgators_balance(cycle)
+        reward_data["delegate_staking_balance"], reward_data[
+            "delegators"] = self.__get_delegators_and_delgators_balance(cycle)
         reward_data["delegators_nb"] = len(reward_data["delegators"])
 
         current_level, head_hash = self.__get_current_level(verbose)
@@ -50,7 +51,8 @@ class RpcRewardApiImpl(RewardApi):
         level_for_relevant_request = (cycle + self.preserved_cycles + 1) * self.blocks_per_cycle
 
         if current_level - level_for_relevant_request >= 0:
-            request_metadata = COMM_BLOCK.format(self.node_url, head_hash, current_level - level_for_relevant_request)+'/metadata/'
+            request_metadata = COMM_BLOCK.format(self.node_url, head_hash,
+                                                 current_level - level_for_relevant_request) + '/metadata/'
             response_metadata = self.wllt_clnt_mngr.send_request(request_metadata)
             metadata = parse_json_response(response_metadata)
             balance_updates = metadata["balance_updates"]
@@ -70,7 +72,8 @@ class RpcRewardApiImpl(RewardApi):
             logger.warn("Please wait until the rewards and fees for cycle {} are unfrozen".format(cycle))
             reward_data["total_rewards"] = 0
 
-        reward_model = RewardProviderModel(reward_data["delegate_staking_balance"], reward_data["total_rewards"], reward_data["delegators"])
+        reward_model = RewardProviderModel(reward_data["delegate_staking_balance"], reward_data["total_rewards"],
+                                           reward_data["delegators"])
 
         if self.validate:
             self.__validate_reward_data(reward_model, cycle)
@@ -127,8 +130,10 @@ class RpcRewardApiImpl(RewardApi):
             else:
                 logger.info("Too few or too many possible snapshots found!")
 
-            level_snapshot_block = (cycle - self.preserved_cycles - 2) * self.blocks_per_cycle + ( chosen_snapshot + 1 ) * self.blocks_per_roll_snapshot
-            request = COMM_BLOCK.format(self.node_url, head_hash, current_level - level_snapshot_block) + " | jq -r .hash"
+            level_snapshot_block = (cycle - self.preserved_cycles - 2) * self.blocks_per_cycle + (
+                        chosen_snapshot + 1) * self.blocks_per_roll_snapshot
+            request = COMM_BLOCK.format(self.node_url, head_hash,
+                                        current_level - level_snapshot_block) + " | jq -r .hash"
             hash_snapshot_block = self.wllt_clnt_mngr.send_request(request).rstrip()
             return hash_snapshot_block
         else:
@@ -146,13 +151,11 @@ class RpcRewardApiImpl(RewardApi):
         if (len(reward_data_rpc.delegator_balance_dict)) == 0:
             return
 
-        #delegators_balance_tzscan = [ int(reward_data_tzscan["delegators_balance"][i][1]) for i in range(len(reward_data_tzscan["delegators_balance"]))]
-        #print(set(list(reward_data_rpc["delegators"].values())))
-        #print(set(delegators_balance_tzscan))
+        # delegators_balance_tzscan = [ int(reward_data_tzscan["delegators_balance"][i][1]) for i in range(len(reward_data_tzscan["delegators_balance"]))]
+        # print(set(list(reward_data_rpc["delegators"].values())))
+        # print(set(delegators_balance_tzscan))
         if not (reward_data_rpc.delegator_balance_dict == reward_data_tzscan.delegator_balance_dict):
             raise Exception("Delegators' balances from local node and tzscan are not identical.")
 
-
         if not reward_data_rpc.total_reward_amount == reward_data_tzscan.total_reward_amount:
             raise Exception("Total rewards from local node and tzscan are not identical.")
-

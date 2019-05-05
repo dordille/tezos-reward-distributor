@@ -106,14 +106,14 @@ class BatchPayer():
         if not self.delegator_pays_xfer_fee: total_amount_to_pay += int(self.default_fee) * len(payment_items)
         logger.info("Total amount to pay is {:,} mutez.".format(total_amount_to_pay))
 
-        logger.debug(
-            "Payment for {} addresses will be done in {} batches".format(len(payment_items), len(payment_items_chunks)))
+        logger.debug("Payment for {} addresses will be done in {} batches".
+                     format(len(payment_items), len(payment_items_chunks)))
 
         total_attempts = 0
 
         payment_logs = []
         op_counter = OpCounter()
-        logger.debug("Payment will be done in {} batches".format(len(payment_items_chunks)))
+
         for i_batch, payment_items_chunk in enumerate(payment_items_chunks):
             logger.debug("Payment of batch {} started".format(i_batch))
             payments_log, attempt = self.pay_single_batch_wrap(payment_items_chunk, verbose=verbose, dry_run=dry_run,
