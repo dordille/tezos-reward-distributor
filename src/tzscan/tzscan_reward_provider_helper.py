@@ -2,7 +2,6 @@ import requests
 
 from exception.tzscan import TzScanException
 from log_config import main_logger
-from tzscan.tzscan_utility import rand_mirror
 
 MAX_PER_PAGE = 50
 
@@ -19,7 +18,7 @@ API = {'MAINNET': {'API_URL': 'http://api%MIRROR%.tzscan.io/v1/'},
 
 class TzScanRewardProviderHelper:
 
-    def __init__(self, nw, baking_address):
+    def __init__(self, nw, baking_address, mirror_selector):
         super(TzScanRewardProviderHelper, self).__init__()
 
         self.api = API[nw['NAME']]
@@ -27,9 +26,11 @@ class TzScanRewardProviderHelper:
             raise TzScanException("Unknown network {}".format(nw))
 
         self.baking_address = baking_address
+        self.mirror_selector = mirror_selector
 
     def __get_nb_delegators(self, cycle, verbose=False):
-        uri = self.api['API_URL'].replace("%MIRROR%", str(rand_mirror())) + nb_delegators_call.format(
+        uri = self.api['API_URL'].replace("%MIRROR%",
+                                          str(self.mirror_selector.get_mirror())) + nb_delegators_call.format(
             self.baking_address, cycle)
 
         if verbose:
@@ -58,7 +59,7 @@ class TzScanRewardProviderHelper:
                 "lost_fees_denounciation": 0}
 
         while nb_delegators_remaining > 0:
-            uri = self.api['API_URL'].replace("%MIRROR%", str(rand_mirror())) + rewards_split_call. \
+            uri = self.api['API_URL'].replace("%MIRROR%", str(self.mirror_selector.get_mirror())) + rewards_split_call. \
                 format(self.baking_address, cycle, p, MAX_PER_PAGE)
 
             if verbose:

@@ -39,7 +39,14 @@ class PaymentRecord():
 
     @staticmethod
     def FromPaymentCSVDictRow(row, cyle):
-        return PaymentRecord(cyle, row["address"], None, None, None, None, row["type"], float(row["payment"]), row["paid"], row["hash"])
+        try:
+            paid = int(row["paid"])
+            paid = paid > 0
+        except ValueError as ve:
+            raise Exception("Unable to read paid value.") from ve
+
+        return PaymentRecord(cyle, row["address"], None, None, None, None, row["type"], float(row["payment"]), paid,
+                             row["hash"])
 
     @staticmethod
     def ManualInstance(file_name, address, payment):
@@ -51,7 +58,6 @@ class PaymentRecord():
         for row in rows:
             print(row)
             items.append(PaymentRecord.FromPaymentCSVDictRow(row, cycle))
-
         return items
 
     @staticmethod

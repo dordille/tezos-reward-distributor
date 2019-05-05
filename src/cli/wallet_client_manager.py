@@ -1,7 +1,10 @@
 from cli.simple_client_manager import SimpleClientManager
 from exception.client import ClientException
+from log_config import main_logger
 from util.address_validator import AddressValidator
 from util.client_utils import clear_terminal_chars, not_indicator_line
+
+logger = main_logger
 
 
 class WalletClientManager(SimpleClientManager):
@@ -73,6 +76,8 @@ class WalletClientManager(SimpleClientManager):
         if self.address_dict is not None:
             return self.address_dict
 
+        logger.debug("Generating known address dictionary")
+
         self.address_dict = {}
 
         if self.contr_dict_by_alias is None:
@@ -84,6 +89,7 @@ class WalletClientManager(SimpleClientManager):
         for pkh, dict_alias_sk in self.addr_dict_by_pkh.items():
             self.address_dict[pkh] = {"pkh": pkh, "originated": False, "alias": dict_alias_sk['alias'],
                                       "sk": dict_alias_sk['sk'], "manager": pkh}
+            logger.debug("Known address added: {}".format(self.address_dict[pkh]))
 
         for alias, pkh in self.contr_dict_by_alias.items():
             if pkh.startswith("KT"):
@@ -96,6 +102,11 @@ class WalletClientManager(SimpleClientManager):
 
                 self.address_dict[pkh] = {"pkh": pkh, "originated": True, "alias": alias, "sk": manager_sk,
                                           "manager": manager}
+
+                logger.debug("Known contract added: {}".format(self.address_dict[pkh]))
+
+        if self.address_dict is None:
+            logger.warn("No known address info is reached. Check your environment. Try to run in privileged mode.")
 
     def __list_known_contracts_by_alias(self):
         response = self.send_request(" list known contracts")

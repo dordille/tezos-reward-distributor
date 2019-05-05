@@ -4,17 +4,24 @@ import os
 import queue
 import sys
 import time
-from datetime import datetime
+from time import sleep
 
+from Constants import RunMode
+from NetworkConfiguration import init_network_config
+from api.provider_factory import ProviderFactory
+from calc.service_fee_calculator import ServiceFeeCalculator
+from cli.simple_client_manager import SimpleClientManager
 from cli.wallet_client_manager import WalletClientManager
 from config.config_parser import ConfigParser
+from config.yaml_baking_conf_parser import BakingYamlConfParser
 from config.yaml_conf_parser import YamlConfParser
 from log_config import main_logger
-from model.payment_log import PaymentRecord
+from model.baking_conf import BakingConf
 from pay.payment_consumer import PaymentConsumer
+from pay.payment_producer import PaymentProducer
 from util.client_utils import get_client_path
 from util.dir_utils import get_payment_root, \
-    get_successful_payments_dir, get_failed_payments_dir
+    get_calculations_root, get_successful_payments_dir, get_failed_payments_dir
 from util.process_life_cycle import ProcessLifeCycle
 
 LINER = "--------------------------------------------"
@@ -25,7 +32,6 @@ payments_queue = queue.Queue(BUF_SIZE)
 logger = main_logger
 
 life_cycle = ProcessLifeCycle()
-MUTEZ = 1
 
 
 def main(args):
@@ -61,25 +67,6 @@ def main(args):
     if 'addresses_by_pkh' in master_cfg:
         addresses_by_pkh = master_cfg['addresses_by_pkh']
 
-    # 3- load payments file
-    payments_file = os.path.expanduser(args.payments_file)
-    if not os.path.isfile(payments_file):
-        raise Exception("payments_file ({}) does not exist.".format(payments_file))
-
-    with open(payments_file, 'r') as file:
-        payment_lines = file.readlines()
-
-    payments_dict = {}
-    for line in payment_lines:
-        pkh, amt = line.split(":")
-        pkh = pkh.strip()
-        amt = float(amt.strip())
-
-        payments_dict[pkh] = amt
-
-    if not payments_dict:
-        raise Exception("No payments to process")
-
     # 3- get client path
 
     client_path = get_client_path([x.strip() for x in args.executable_dirs.split(',')],
@@ -88,15 +75,44 @@ def main(args):
 
     logger.debug("Tezos client path is {}".format(client_path))
 
-    # 4- get client path
-    client_path = get_client_path([x.strip() for x in args.executable_dirs.split(',')],
-                                  args.docker, args.network,
-                                  args.verbose)
+    # 4. get network config     
+    config_client_manager = SimpleClientManager(client_path)
+    network_config_map = init_network_config(args.network, config_client_manager, args.node_addr)
+    network_config = network_config_map[args.network]
 
-    logger.debug("Tezos client path is {}".format(client_path))
+    # 5- load baking configuration file
+    config_file_path = get_baking_configuration_file(config_dir)
+
+    logger.info("Loading baking configuration file {}".format(config_file_path))
+
+    wllt_clnt_mngr = WalletClientManager(client_path, contracts_by_alias, addresses_by_pkh, managers,
+                                         verbose=args.verbose)
+
+    provider_factory = ProviderFactory(args.reward_data_provider)
+    parser = BakingYamlConfParser(ConfigParser.load_file(config_file_path), wllt_clnt_mngr, provider_factory,
+                                  network_config, args.node_addr)
+    parser.parse()
+    parser.validate()
+    parser.process()
+    cfg_dict = parser.get_conf_obj()
+
+    # dictionary to BakingConf object, for a bit of type safety
+    cfg = BakingConf(cfg_dict, master_cfg)
+
+    logger.info("Baking Configuration {}".format(cfg))
+
+    baking_address = cfg.get_baking_address()
+    payment_address = cfg.get_payment_address()
+    logger.info(LINER)
+    logger.info("BAKING ADDRESS is {}".format(baking_address))
+    logger.info("PAYMENT ADDRESS is {}".format(payment_address))
+    logger.info(LINER)
 
     # 6- is it a reports run
-    dry_run = args.dry_run
+    dry_run = args.dry_run_no_payments or args.dry_run
+    if args.dry_run_no_payments:
+        global NB_CONSUMERS
+        NB_CONSUMERS = 0
 
     # 7- get reporting directories
     reports_dir = os.path.expanduser(args.reports_dir)
@@ -105,41 +121,45 @@ def main(args):
     if dry_run:
         reports_dir = os.path.expanduser("./reports")
 
-    reports_dir = os.path.join(reports_dir, "manual")
+    reports_dir = os.path.join(reports_dir, baking_address)
 
     payments_root = get_payment_root(reports_dir, create=True)
+    calculations_root = get_calculations_root(reports_dir, create=True)
     get_successful_payments_dir(payments_root, create=True)
     get_failed_payments_dir(payments_root, create=True)
 
-    wllt_clnt_mngr = WalletClientManager(client_path, contracts_by_alias, addresses_by_pkh, managers)
+    # 8- start the life cycle
+    life_cycle.start(False)
+
+    # 9- service fee calculator
+    srvc_fee_calc = ServiceFeeCalculator(cfg.get_full_supporters_set(), cfg.get_specials_map(), cfg.get_service_fee())
+
+    p = PaymentProducer(name='producer', initial_payment_cycle=None, network_config=network_config,
+                        payments_dir=payments_root, calculations_dir=calculations_root, run_mode=RunMode.ONETIME,
+                        service_fee_calc=srvc_fee_calc, release_override=0,
+                        payment_offset=0, baking_cfg=cfg, life_cycle=life_cycle,
+                        payments_queue=payments_queue, dry_run=dry_run, wllt_clnt_mngr=wllt_clnt_mngr,
+                        node_url=args.node_addr, provider_factory=provider_factory, verbose=args.verbose)
+    p.retry_failed_payments()
 
     for i in range(NB_CONSUMERS):
-        c = PaymentConsumer(name='manual_payment_consumer', payments_dir=payments_root,
-                            key_name=args.paymentaddress,
+        c = PaymentConsumer(name='consumer' + str(i), payments_dir=payments_root, key_name=payment_address,
                             client_path=client_path, payments_queue=payments_queue, node_addr=args.node_addr,
                             wllt_clnt_mngr=wllt_clnt_mngr, verbose=args.verbose, dry_run=dry_run,
-                            delegator_pays_xfer_fee=False)
+                            delegator_pays_xfer_fee=cfg.get_delegator_pays_xfer_fee())
         time.sleep(1)
         c.start()
 
-    base_name_no_ext = os.path.basename(payments_file)
-    base_name_no_ext = os.path.splitext(base_name_no_ext)[0]
-    now = datetime.now()
-    now_str = now.strftime("%Y%m%d%H%M%S")
-    file_name = base_name_no_ext + "_" + now_str
+        logger.info("Application start completed")
+        logger.info(LINER)
 
-    payment_items = []
-    for key, value in payments_dict.items():
-        pi = PaymentRecord.ManualInstance(file_name, key, value)
-        pi.payment = pi.payment * MUTEZ
-        payment_items.append(pi)
-
-        logger.info("Reward created for cycle %s address %s amount %f fee %f tz type %s",
-                    pi.cycle, pi.address, pi.payment, pi.fee,
-                    pi.type)
-
-    payments_queue.put(payment_items)
-    payments_queue.put([PaymentRecord.ExitInstance()])
+    sleep(5)
+    p.exit()
+    try:
+        while life_cycle.is_running(): time.sleep(10)
+    except KeyboardInterrupt:
+        logger.info("Interrupted.")
+        life_cycle.stop()
 
 
 def get_baking_configuration_file(config_dir):
@@ -158,22 +178,6 @@ def get_baking_configuration_file(config_dir):
     return os.path.join(config_dir, config_file)
 
 
-def get_latest_report_file(payments_root):
-    recent = None
-    if get_successful_payments_dir(payments_root):
-        files = sorted([os.path.splitext(x)[0] for x in os.listdir(get_successful_payments_dir(payments_root))],
-                       key=lambda x: int(x))
-        recent = files[-1] if len(files) > 0 else None
-    return recent
-
-
-class ReleaseOverrideAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        if not -11 <= values:
-            parser.error("Valid range for release-override({0}) is [-11,) ".format(option_string))
-
-        setattr(namespace, "realase_override", values)
-
 
 if __name__ == '__main__':
 
@@ -181,19 +185,19 @@ if __name__ == '__main__':
         raise Exception("Must be using Python 3")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("paymentaddress",
-                        help="tezos account address (PKH) or an alias to make payments. If tezos signer is used "
-                             "to sign for the address, it is necessary to use an alias.")
-    parser.add_argument("payments_file", help="File of payment lines. Each line should contain PKH:amount. "
-                                              "For example: KT1QRZLh2kavAJdrQ6TjdhBgjpwKMRfwCBmQ:123.33")
     parser.add_argument("-N", "--network", help="network name", choices=['ZERONET', 'ALPHANET', 'MAINNET'],
                         default='MAINNET')
+    parser.add_argument("-P", "--reward_data_provider", help="where reward data is provided", choices=['tzscan', 'rpc'],
+                        default='tzscan')
     parser.add_argument("-r", "--reports_dir", help="Directory to create reports", default='~/pymnt/reports')
     parser.add_argument("-f", "--config_dir", help="Directory to find baking configurations", default='~/pymnt/cfg')
     parser.add_argument("-A", "--node_addr", help="Node host:port pair", default='127.0.0.1:8732')
     parser.add_argument("-D", "--dry_run",
                         help="Run without injecting payments. Suitable for testing. Does not require locking.",
-                        default=True)
+                        action="store_true")
+    parser.add_argument("-Dn", "--dry_run_no_payments",
+                        help="Run without doing any payments. Suitable for testing. Does not require locking.",
+                        action="store_true")
     parser.add_argument("-E", "--executable_dirs",
                         help="Comma separated list of directories to search for client executable. Prefer single "
                              "location when setting client directory. If -d is set, point to location where tezos docker "
@@ -208,9 +212,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    logger.info("Tezos Reward Distributor Manual Payment Script Starting")
+    logger.info("Tezos Reward Distributor - Retry Failed Files is Starting")
     logger.info(LINER)
-    logger.info("Copyright Hüseyin ABANOZ 2019")
+    logger.info("Copyright Huseyin ABANOZ 2019")
     logger.info("huseyinabanox@gmail.com")
     logger.info("Please leave copyright information")
     logger.info(LINER)

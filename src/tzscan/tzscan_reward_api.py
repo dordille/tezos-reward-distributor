@@ -6,13 +6,14 @@ from tzscan.tzscan_reward_provider_helper import TzScanRewardProviderHelper
 
 logger = main_logger
 
+
 class TzScanRewardApiImpl(RewardApi):
 
-    def __init__(self, nw, baking_address):
+    def __init__(self, nw, baking_address, mirror_selector):
         super().__init__()
 
         self.logger = main_logger
-        self.helper = TzScanRewardProviderHelper(nw, baking_address)
+        self.helper = TzScanRewardProviderHelper(nw, baking_address, mirror_selector)
 
     def get_rewards_for_cycle_map(self, cycle, verbose=False):
         root = self.helper.get_rewards_for_cycle(cycle, verbose)
@@ -27,7 +28,7 @@ class TzScanRewardApiImpl(RewardApi):
         fees = int(root["fees"])
 
         total_reward_amount = (blocks_rewards + endorsements_rewards + future_blocks_rewards +
-                              future_endorsements_rewards + fees - lost_rewards_denounciation - lost_fees_denounciation)
+                               future_endorsements_rewards + fees - lost_rewards_denounciation - lost_fees_denounciation)
 
         delegators_balance = root["delegators_balance"]
 
