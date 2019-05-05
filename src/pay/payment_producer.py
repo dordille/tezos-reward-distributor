@@ -169,11 +169,15 @@ class PaymentProducer(threading.Thread):
             total_amount_to_pay = sum([rl.amount for rl in reward_logs if rl.payable])
             # 3- check for past payment evidence for current cycle
             past_payment_state = check_past_payment(self.payments_root, payment_cycle)
+
+            already_paid = False
+
             if not self.dry_run and total_amount_to_pay > 0 and past_payment_state:
                 logger.warn(past_payment_state)
-                total_amount_to_pay = 0
+                already_paid = True
+
             # 4- if total_rewards > 0, proceed with payment
-            if total_amount_to_pay > 0:
+            if total_amount_to_pay > 0 and not already_paid:
                 report_file_path = get_calculation_report_file(self.calculations_dir, payment_cycle)
 
                 # 5- send to payment consumer
@@ -186,8 +190,9 @@ class PaymentProducer(threading.Thread):
                 # 6- create calculations report file. This file contains calculations details
                 self.create_calculations_report(payment_cycle, reward_logs, report_file_path,
                                                 total_amount)
-            else:
+            elif total_amount_to_pay == 0:
                 logger.info("Total payment amount is 0. Nothing to pay!")
+
             # 7- next cycle
             # processing of cycle is done
             logger.info("Reward creation is done for cycle %s.", payment_cycle)
