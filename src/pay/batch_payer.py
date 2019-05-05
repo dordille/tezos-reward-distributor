@@ -148,6 +148,8 @@ class BatchPayer():
             # force re-read of counter at every try
             op_counter.set(None)
 
+            attempt_count += 1
+
             # if successful, do not try anymore
             if return_code:
                 break
@@ -157,8 +159,6 @@ class BatchPayer():
             # But do not wait after last attempt
             if attempt < max_try - 1:
                 self.wait_random()
-
-            attempt_count += 1
 
         for payment_item in payment_items:
             payment_item.paid = return_code
@@ -201,7 +201,8 @@ class BatchPayer():
                                                                                                    self.storage_limit)
             content_list.append(content)
 
-            logger.debug("Payment content: {}".format(content))
+            if verbose:
+                logger.debug("Payment content: {}".format(content))
 
         contents_string = ",".join(content_list)
 
