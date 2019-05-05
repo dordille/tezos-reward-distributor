@@ -5,7 +5,6 @@ import threading
 import time
 
 from Constants import RunMode
-from api.provider_factory import ProviderFactory
 from calc.phased_payment_calculator import PhasedPaymentCalculator
 from exception.tzscan import TzScanException
 from log_config import main_logger
@@ -57,7 +56,7 @@ class PaymentProducer(threading.Thread):
 
         self.payment_calc = PhasedPaymentCalculator(self.founders_map, self.owners_map, self.fee_calc,
                                                     self.min_delegation_amt_in_mutez, self.rules_model)
-        logger.debug('Producer started')
+        logger.info('Producer started')
 
     def exit(self):
         if not self.exiting:
@@ -83,7 +82,7 @@ class PaymentProducer(threading.Thread):
             # take a breath
             time.sleep(5)
 
-            logger.debug("Trying payments for cycle {}".format(payment_cycle))
+            logger.info("Trying payments for cycle {}".format(payment_cycle))
 
             try:
                 current_level = self.block_api.get_current_level(verbose=self.verbose)
@@ -95,7 +94,7 @@ class PaymentProducer(threading.Thread):
 
                 logger.debug("Checking for pending payments : payment_cycle <= "
                              "current_cycle - (self.nw_config['NB_FREEZE_CYCLE'] + 1) - self.release_override")
-                logger.debug("Checking for pending payments : checking {} <= {} - ({} + 1) - {}".
+                logger.info("Checking for pending payments : checking {} <= {} - ({} + 1) - {}".
                              format(payment_cycle, current_cycle, self.nw_config['NB_FREEZE_CYCLE'],
                                     self.release_override))
 
@@ -121,7 +120,7 @@ class PaymentProducer(threading.Thread):
                         time.sleep(60 * 3)
                 # end of payment cycle check
                 else:
-                    logger.debug("No pending payments for cycle {}, current cycle is {}".
+                    logger.info("No pending payments for cycle {}, current cycle is {}".
                                  format(payment_cycle, current_cycle))
 
                     # pending payments done. Do not wait any more.
@@ -185,7 +184,7 @@ class PaymentProducer(threading.Thread):
                 # logger.info("Total payment amount is {:,} mutez. %s".format(total_amount_to_pay),
                 #            "" if self.delegator_pays_xfer_fee else "(Transfer fee is not included)")
 
-                logger.info("Creating calculation report (%s)", report_file_path)
+                logger.debug("Creating calculation report (%s)", report_file_path)
 
                 # 6- create calculations report file. This file contains calculations details
                 self.create_calculations_report(payment_cycle, reward_logs, report_file_path,
@@ -245,7 +244,7 @@ class PaymentProducer(threading.Thread):
                                  pymnt_log.desc if pymnt_log.desc else "None"
                                  ])
 
-                logger.info("Reward created for address %s type %s balance {:>10.2f} ratio {:.8f} fee_ratio {:.6f} "
+                logger.debug("Reward created for address %s type %s balance {:>10.2f} ratio {:.8f} fee_ratio {:.6f} "
                             "amount {:>8.2f} fee_amount {:.2f} fee_rate {:.2f} payable %s skipped %s atphase %s desc %s"
                             .format(pymnt_log.balance / MUTEZ, pymnt_log.ratio, pymnt_log.service_fee_ratio,
                                     pymnt_log.amount / MUTEZ, pymnt_log.service_fee_amount / MUTEZ,
@@ -265,17 +264,17 @@ class PaymentProducer(threading.Thread):
         payment_reports_failed = [os.path.join(failed_payments_dir, x) for x in
                                   os.listdir(failed_payments_dir) if x.endswith('.csv')]
 
-        logger.debug("Trying failed payments : '{}'".format(",".join(payment_reports_failed)))
+        logger.info("Trying failed payments : '{}'".format(",".join(payment_reports_failed)))
 
         # 2- for each csv file with name csv_report.csv
         for payment_failed_report_file in payment_reports_failed:
-            logger.debug("Working on failed payment file {}".format(payment_failed_report_file))
+            logger.info("Working on failed payment file {}".format(payment_failed_report_file))
 
             # 2.1 - if there is a file csv_report.csv under payments/done, it means payment is already done
             if os.path.isfile(payment_failed_report_file.replace(PAYMENT_FAILED_DIR, PAYMENT_DONE_DIR)):
                 # remove payments/failed/csv_report.csv
                 os.remove(payment_failed_report_file)
-                logger.debug(
+                logger.info(
                     "Payment for failed payment {} is already done. Removing.".format(payment_failed_report_file))
 
                 # remove payments/failed/csv_report.csv.BUSY
@@ -288,7 +287,7 @@ class PaymentProducer(threading.Thread):
             # 2.2 - if queue is full, wait for sometime
             # make sure the queue is not full
             while self.payments_queue.full():
-                logger.info("Payments queue is full. Wait a few minutes.")
+                logger.debug("Payments queue is full. Wait a few minutes.")
                 time.sleep(60 * 3)
 
             cycle = int(os.path.splitext(os.path.basename(payment_failed_report_file))[0])

@@ -23,12 +23,12 @@ def count_and_log_failed(payment_logs, pymnt_cycle):
     nb_failed = 0
     for pymnt_itm in payment_logs:
         if pymnt_itm.paid:
-            logger.info("Reward paid for cycle %s address %s amount %f tz type %s",
-                        pymnt_cycle, pymnt_itm.address, pymnt_itm.amount, pymnt_itm.type)
+            logger.debug("Reward paid for cycle %s address %s amount %f tz type %s",
+                         pymnt_cycle, pymnt_itm.address, pymnt_itm.amount, pymnt_itm.type)
         else:
             nb_failed = nb_failed + 1
-            logger.warning("No Reward paid for cycle %s address %s amount %f tz: Reason client failed!",
-                           pymnt_cycle, pymnt_itm.address, pymnt_itm.amount)
+            logger.debug("No Reward paid for cycle %s address %s amount %f tz: Reason client failed!",
+                         pymnt_cycle, pymnt_itm.address, pymnt_itm.amount)
     return nb_failed
 
 
@@ -130,10 +130,10 @@ class PaymentConsumer(threading.Thread):
     #
     # create report file
     def create_payment_report(self, nb_failed, payment_logs, payment_cycle, total_attempts):
-        logger.info("Payment completed for {} addresses".format(len(payment_logs)))
+        logger.info("Payment completed for {} addresses, {} failed.".format(len(payment_logs), nb_failed))
 
         report_file = payment_report_file_path(self.payments_dir, payment_cycle, nb_failed)
-        logger.info("Creating payment report (%s)", report_file)
+        logger.debug("Creating payment report (%s)", report_file)
 
         with open(report_file, "w") as f:
             csv_writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -152,7 +152,7 @@ class PaymentConsumer(threading.Thread):
                              pl.address])
 
                 logger.debug("Payment done for address %s type %s amount {:>8.2f} paid %s".format(pl.amount / MUTEZ),
-                            pl.address, pl.type, pl.paid)
+                             pl.address, pl.type, pl.paid)
 
         if self.publish_stats and not self.dry_run and (not self.args or self.args.network == 'MAINNET'):
             n_f_type = len([pl for pl in payment_logs if pl.type == TYPE_FOUNDER] +
@@ -167,8 +167,8 @@ class PaymentConsumer(threading.Thread):
             n_m_type = len([pl for pl in payment_logs if pl.type == TYPE_MERGED])
 
             stats_dict = {}
-            stats_dict['tot_amnt'] = int(sum([rl.amount for rl in payment_logs])/1e+9) # in 1K tezos
-            stats_dict['nb_pay'] = int(len(payment_logs)/10)
+            stats_dict['tot_amnt'] = int(sum([rl.amount for rl in payment_logs]) / 1e+9)  # in 1K tezos
+            stats_dict['nb_pay'] = int(len(payment_logs) / 10)
             stats_dict['nb_failed'] = nb_failed
             stats_dict['tot_attmpt'] = total_attempts
             stats_dict['nb_f'] = n_f_type

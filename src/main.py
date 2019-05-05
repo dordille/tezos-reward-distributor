@@ -51,12 +51,12 @@ def main(args):
 
     master_cfg = {}
     if os.path.isfile(master_config_file_path):
-        logger.info("Loading master configuration file {}".format(master_config_file_path))
+        logger.debug("Loading master configuration file {}".format(master_config_file_path))
 
         master_parser = YamlConfParser(ConfigParser.load_file(master_config_file_path))
         master_cfg = master_parser.parse()
     else:
-        logger.info("master configuration file not present.")
+        logger.debug("master configuration file not present.")
 
     managers = None
     contracts_by_alias = None
