@@ -122,7 +122,7 @@ class BatchPayer():
             total_attempts += attempt
             logger.debug("Payment of a batch is complete")
 
-        return payment_logs
+        return payment_logs, total_attempts
 
     def pay_single_batch_wrap(self, payment_items, op_counter, verbose=None, dry_run=None):
 
