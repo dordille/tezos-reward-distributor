@@ -110,7 +110,7 @@ class RpcRewardApiImpl(RewardApi):
                 response = parse_json_response(response)
                 delegators[delegator] = int(response["balance"])
         except:
-            logger.warn('No delegators or unexpected error')
+            logger.warn('No delegators or unexpected error', exc_info=True)
 
         return delegate_staking_balance, delegators
 
@@ -131,7 +131,7 @@ class RpcRewardApiImpl(RewardApi):
                 logger.info("Too few or too many possible snapshots found!")
 
             level_snapshot_block = (cycle - self.preserved_cycles - 2) * self.blocks_per_cycle + (
-                        chosen_snapshot + 1) * self.blocks_per_roll_snapshot
+                    chosen_snapshot + 1) * self.blocks_per_roll_snapshot
             request = COMM_BLOCK.format(self.node_url, head_hash,
                                         current_level - level_snapshot_block) + " | jq -r .hash"
             hash_snapshot_block = self.wllt_clnt_mngr.send_request(request).rstrip()
