@@ -120,10 +120,9 @@ class BatchPayer():
                                                                op_counter=op_counter)
 
             logger.info("Payment of batch {} is complete, in {} attempts".format(i_batch, attempt))
-            
+
             payment_logs.extend(payments_log)
             total_attempts += attempt
-
 
         return payment_logs, total_attempts
 
@@ -158,6 +157,8 @@ class BatchPayer():
             # But do not wait after last attempt
             if attempt < max_try - 1:
                 self.wait_random()
+
+            attempt_count += 1
 
         for payment_item in payment_items:
             payment_item.paid = return_code

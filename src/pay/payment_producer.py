@@ -82,8 +82,6 @@ class PaymentProducer(threading.Thread):
             # take a breath
             time.sleep(5)
 
-            logger.info("Trying payments for cycle {}".format(payment_cycle))
-
             try:
                 current_level = self.block_api.get_current_level(verbose=self.verbose)
                 current_cycle = self.block_api.level_to_cycle(current_level)
@@ -264,7 +262,7 @@ class PaymentProducer(threading.Thread):
         payment_reports_failed = [os.path.join(failed_payments_dir, x) for x in
                                   os.listdir(failed_payments_dir) if x.endswith('.csv')]
 
-        logger.info("Trying failed payments : '{}'".format(",".join(payment_reports_failed)))
+        logger.debug("Trying failed payments : '{}'".format(",".join(payment_reports_failed)))
 
         # 2- for each csv file with name csv_report.csv
         for payment_failed_report_file in payment_reports_failed:
