@@ -10,7 +10,7 @@ class SimpleClientManager:
         self.verbose = verbose
         self.client_path = client_path
 
-    def send_request(self, cmd, verbose_override=None):
+    def send_request(self, cmd, verbose_override=None, ignore_stderr=None):
         whole_cmd = self.client_path + cmd
         verbose = self.verbose
 
@@ -28,11 +28,10 @@ class SimpleClientManager:
         for b in process.stdout:
             bytes.append(b)
 
-        if verbose:
-            print("--- Verbose : Nothing in stdout, reading stderr...")
-
         # if no response in stdout, read stderr
         if not bytes:
+            if verbose:
+                print("--- Verbose : Nothing in stdout, reading stderr...")
             for b in process.stderr:
                 bytes.append(b)
 
