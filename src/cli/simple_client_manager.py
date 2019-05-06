@@ -29,7 +29,7 @@ class SimpleClientManager:
             bytes.append(b)
 
         # if no response in stdout, read stderr
-        if not bytes:
+        if False:
             if verbose:
                 print("--- Verbose : Nothing in stdout, reading stderr...")
             for b in process.stderr:
