@@ -3,7 +3,7 @@ from api.reward_api import RewardApi
 from log_config import main_logger
 from model.reward_provider_model import RewardProviderModel
 from tzscan.mirror_selection_helper import TzScanMirrorSelector
-from util.cmd_mngr import CommandManager
+from cli.cmd_mngr import CommandManager
 from util.rpc_utils import parse_json_response, extract_json_part
 from tzscan.tzscan_reward_api import TzScanRewardApiImpl
 
