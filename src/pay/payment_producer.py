@@ -8,9 +8,10 @@ from Constants import RunMode
 from calc.phased_payment_calculator import PhasedPaymentCalculator
 from exception.tzscan import TzScanException
 from log_config import main_logger
-from model.payment_log import PaymentRecord
+from model.reward_log import RewardLog
 from model.rules_model import RulesModel
 from pay.double_payment_check import check_past_payment
+from util.csv_payment_file_parser import CsvPaymentFileParser
 from util.dir_utils import get_calculation_report_file, get_failed_payments_dir, PAYMENT_FAILED_DIR, PAYMENT_DONE_DIR, \
     remove_busy_file, BUSY_FILE
 
@@ -91,8 +92,8 @@ class PaymentProducer(threading.Thread):
                 logger.debug("Checking for pending payments : payment_cycle <= "
                              "current_cycle - (self.nw_config['NB_FREEZE_CYCLE'] + 1) - self.release_override")
                 logger.info("Checking for pending payments : checking {} <= {} - ({} + 1) - {}".
-                             format(payment_cycle, current_cycle, self.nw_config['NB_FREEZE_CYCLE'],
-                                    self.release_override))
+                            format(payment_cycle, current_cycle, self.nw_config['NB_FREEZE_CYCLE'],
+                                   self.release_override))
 
                 # payments should not pass beyond last released reward cycle
                 if payment_cycle <= current_cycle - (self.nw_config['NB_FREEZE_CYCLE'] + 1) - self.release_override:
@@ -117,7 +118,7 @@ class PaymentProducer(threading.Thread):
                 # end of payment cycle check
                 else:
                     logger.info("No pending payments for cycle {}, current cycle is {}".
-                                 format(payment_cycle, current_cycle))
+                                format(payment_cycle, current_cycle))
 
                     # pending payments done. Do not wait any more.
                     if self.run_mode == RunMode.PENDING:
@@ -187,7 +188,8 @@ class PaymentProducer(threading.Thread):
                                                 total_amount)
                 # 7- next cycle
                 # processing of cycle is done
-                logger.info("Reward creation is done for cycle {}, {} payments.".format(payment_cycle, len(reward_logs)))
+                logger.info(
+                    "Reward creation is done for cycle {}, {} payments.".format(payment_cycle, len(reward_logs)))
 
             elif total_amount_to_pay == 0:
                 logger.info("Total payment amount is 0. Nothing to pay!")
@@ -241,15 +243,15 @@ class PaymentProducer(threading.Thread):
                                  ])
 
                 logger.debug("Reward created for address %s type %s balance {:>10.2f} ratio {:.8f} fee_ratio {:.6f} "
-                            "amount {:>8.2f} fee_amount {:.2f} fee_rate {:.2f} payable %s skipped %s atphase %s desc %s"
-                            .format(pymnt_log.balance / MUTEZ, pymnt_log.ratio, pymnt_log.service_fee_ratio,
-                                    pymnt_log.amount / MUTEZ, pymnt_log.service_fee_amount / MUTEZ,
-                                    pymnt_log.service_fee_rate), pymnt_log.address, pymnt_log.type, pymnt_log.payable,
-                            pymnt_log.skipped, pymnt_log.skippedatphase, pymnt_log.desc)
+                             "amount {:>8.2f} fee_amount {:.2f} fee_rate {:.2f} payable %s skipped %s atphase %s desc %s"
+                             .format(pymnt_log.balance / MUTEZ, pymnt_log.ratio, pymnt_log.service_fee_ratio,
+                                     pymnt_log.amount / MUTEZ, pymnt_log.service_fee_amount / MUTEZ,
+                                     pymnt_log.service_fee_rate), pymnt_log.address, pymnt_log.type, pymnt_log.payable,
+                             pymnt_log.skipped, pymnt_log.skippedatphase, pymnt_log.desc)
 
     @staticmethod
     def create_exit_payment():
-        return PaymentRecord.ExitInstance()
+        return RewardLog.ExitInstance()
 
     def retry_failed_payments(self):
         logger.info("retry_failed_payments started")
@@ -289,17 +291,12 @@ class PaymentProducer(threading.Thread):
             cycle = int(os.path.splitext(os.path.basename(payment_failed_report_file))[0])
 
             # 2.3 read payments/failed/csv_report.csv file into a list of dictionaries
-            with open(payment_failed_report_file) as f:
-                # read csv into list of dictionaries
-                dict_rows = [{key: value for key, value in row.items()} for row in
-                             csv.DictReader(f, skipinitialspace=True)]
+            batch = CsvPaymentFileParser().parse(payment_failed_report_file, cycle)
 
-                batch = PaymentRecord.FromPaymentCSVDictRows(dict_rows, cycle)
+            # 2.4 put records into payment_queue. payment_consumer will make payments
+            self.payments_queue.put(batch)
 
-                # 2.4 put records into payment_queue. payment_consumer will make payments
-                self.payments_queue.put(batch)
-
-                # 2.5 rename payments/failed/csv_report.csv to payments/failed/csv_report.csv.BUSY
-                # mark the files as in use. we do not want it to be read again
-                # BUSY file will be removed, if successful payment is done
-                os.rename(payment_failed_report_file, payment_failed_report_file + BUSY_FILE)
+            # 2.5 rename payments/failed/csv_report.csv to payments/failed/csv_report.csv.BUSY
+            # mark the files as in use. we do not want it to be read again
+            # BUSY file will be removed, if successful payment is done
+            os.rename(payment_failed_report_file, payment_failed_report_file + BUSY_FILE)

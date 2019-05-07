@@ -10,7 +10,7 @@ from cli.wallet_client_manager import WalletClientManager
 from config.config_parser import ConfigParser
 from config.yaml_conf_parser import YamlConfParser
 from log_config import main_logger
-from model.payment_log import PaymentRecord
+from model.reward_log import RewardLog
 from pay.payment_consumer import PaymentConsumer
 from util.client_utils import get_client_path
 from util.dir_utils import get_payment_root, \
@@ -130,7 +130,7 @@ def main(args):
 
     payment_items = []
     for key, value in payments_dict.items():
-        pi = PaymentRecord.ManualInstance(file_name, key, value)
+        pi = RewardLog.ExternalInstance(file_name, key, value)
         pi.payment = pi.payment * MUTEZ
         payment_items.append(pi)
 
@@ -139,7 +139,7 @@ def main(args):
                     pi.type)
 
     payments_queue.put(payment_items)
-    payments_queue.put([PaymentRecord.ExitInstance()])
+    payments_queue.put([RewardLog.ExitInstance()])
 
 
 def get_baking_configuration_file(config_dir):

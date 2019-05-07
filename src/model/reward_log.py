@@ -1,11 +1,15 @@
 from enum import Enum
 
+from Constants import EXIT_PAYMENT_TYPE
+
 TYPE_DELEGATOR = "D"
 TYPE_FOUNDER = "F"
 TYPE_OWNER = "O"
 TYPE_OWNERS_PARENT = "OWNERS_PARENT"
 TYPE_FOUNDERS_PARENT = "FOUNDERS_PARENT"
 TYPE_MERGED = "M"
+
+TYPE_EXTERNAL = "E"
 
 
 # TYPE_MERGED = "MERGED"
@@ -41,9 +45,9 @@ class RewardLog:
         self.amount = 0
         self.parents = None
 
-        self.paid=False
-        self.hash="0"
-        self.payable=True
+        self.paid = False
+        self.hash = "0"
+        self.payable = True
 
     def skip(self, desc, phase):
         if self.skipped:
@@ -58,6 +62,17 @@ class RewardLog:
 
     def __repr__(self) -> str:
         return "address: %s, type: %s, balance: %s, disabled:%s" % (self.address, self.type, self.balance, self.skipped)
+
+    @staticmethod
+    def ExitInstance():
+        return RewardLog(address=EXIT_PAYMENT_TYPE, type=EXIT_PAYMENT_TYPE, balance=0)
+
+    @staticmethod
+    def ExternalInstance(file_name, address, amount):
+        rl = RewardLog(address, TYPE_EXTERNAL, 0)
+        rl.amount = amount
+        rl.desc = file_name
+        return rl
 
 
 def cmp_by_skip_type_balance(rl1, rl2):
