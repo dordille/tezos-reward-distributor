@@ -136,6 +136,8 @@ class RpcRewardApiImpl(RewardApi):
             cmd_mngr = CommandManager(verbose=True)
             hash_snapshot_block = cmd_mngr.send_request("echo '{}' | jq -r .hash".format(comm_block_response_json))
 
+            logger.debug("Hash of snapshot block is {}".format(hash_snapshot_block))
+
             return hash_snapshot_block
         else:
             logger.info("Cycle too far in the future")

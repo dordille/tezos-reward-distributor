@@ -42,7 +42,7 @@ class SimpleClientManager:
         if verbose:
             print("<-- Verbose : Answer is |{}|".format(buffer))
 
-        return buffer
+        return buffer.strip()
 
     def sign(self, bytes, key_name):
         response = self.send_request(" sign bytes 0x03{} for {}".format(bytes, key_name))
