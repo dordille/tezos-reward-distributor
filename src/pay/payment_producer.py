@@ -67,14 +67,12 @@ class PaymentProducer(threading.Thread):
 
     def run(self):
         current_cycle = self.block_api.get_current_cycle()
-
         payment_cycle = self.initial_payment_cycle
 
         # if non-positive initial_payment_cycle, set initial_payment_cycle to
         # 'current cycle - abs(initial_cycle) - (NB_FREEZE_CYCLE+1)'
         if self.initial_payment_cycle <= 0:
-            payment_cycle = current_cycle - abs(self.initial_payment_cycle) - (
-                    self.nw_config['NB_FREEZE_CYCLE'] + 1)
+            payment_cycle = current_cycle - abs(self.initial_payment_cycle) - (self.nw_config['NB_FREEZE_CYCLE'] + 1)
             logger.debug("Payment cycle is set to {}".format(payment_cycle))
 
         while not self.exiting and self.life_cycle.is_running():

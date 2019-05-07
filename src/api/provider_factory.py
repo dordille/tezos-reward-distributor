@@ -1,6 +1,6 @@
 from rpc.rpc_block_api import RpcBlockApiImpl
 from rpc.rpc_reward_api import RpcRewardApiImpl
-from tzscan.mirror_selection_helper import TzScanMirrorSelector
+from tzscan.tzscan_mirror_selection_helper import TzScanMirrorSelector
 from tzscan.tzscan_block_api import TzScanBlockApiImpl
 from tzscan.tzscan_reward_api import TzScanRewardApiImpl
 

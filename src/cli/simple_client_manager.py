@@ -1,4 +1,4 @@
-from cli.cmd_mngr import CommandManager
+from cli.cmd_manager import CommandManager
 from exception.client import ClientException
 from util.client_utils import clear_terminal_chars
 

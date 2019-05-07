@@ -2,8 +2,8 @@ from api.reward_api import RewardApi
 
 from log_config import main_logger
 from model.reward_provider_model import RewardProviderModel
-from tzscan.mirror_selection_helper import TzScanMirrorSelector
-from cli.cmd_mngr import CommandManager
+from tzscan.tzscan_mirror_selection_helper import TzScanMirrorSelector
+from cli.cmd_manager import CommandManager
 from util.rpc_utils import parse_json_response, extract_json_part
 from tzscan.tzscan_reward_api import TzScanRewardApiImpl
 
@@ -103,11 +103,13 @@ class RpcRewardApiImpl(RewardApi):
             delegate_staking_balance = int(response["staking_balance"])
 
             delegators_addresses = response["delegated_contracts"]
-            for delegator in delegators_addresses:
+            for idx, delegator in enumerate(delegators_addresses):
                 request = COMM_DELEGATE_BALANCE.format(self.node_url, hash_snapshot_block, delegator)
                 response = self.wllt_clnt_mngr.send_request(request)
                 response = parse_json_response(response)
                 delegators[delegator] = int(response["balance"])
+
+                logger.debug("Delegator info ({}/{}) fetched: address {}, balance {}".format(idx, len(delegators_addresses), delegator, delegators[delegator]))
         except:
             logger.warn('No delegators or unexpected error', exc_info=True)
 
@@ -133,7 +135,7 @@ class RpcRewardApiImpl(RewardApi):
             request = COMM_BLOCK.format(self.node_url, head_hash, current_level - level_snapshot_block)
             comm_block_response = self.wllt_clnt_mngr.send_request(request).rstrip()
             comm_block_response_json = extract_json_part(comm_block_response, verbose=True)
-            cmd_mngr = CommandManager(verbose=True)
+            cmd_mngr = CommandManager(verbose=verbose)
             hash_snapshot_block = cmd_mngr.send_request("echo '{}' | jq -r .hash".format(comm_block_response_json))
 
             logger.debug("Hash of snapshot block is {}".format(hash_snapshot_block))
