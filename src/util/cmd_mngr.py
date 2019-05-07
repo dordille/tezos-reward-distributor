@@ -7,4 +7,4 @@ class CommandManager:
         self.client_manager = SimpleClientManager("", verbose)
 
     def send_request(self, cmd, verbose_override=None):
-        self.client_manager.send_request(cmd, verbose_override)
+        return self.client_manager.send_request(cmd, verbose_override)

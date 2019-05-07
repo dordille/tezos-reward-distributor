@@ -38,11 +38,12 @@ class SimpleClientManager:
         process.wait()
 
         buffer = b''.join(bytes).decode('utf-8')
+        buffer = buffer.strip()
 
         if verbose:
             print("<-- Verbose : Answer is |{}|".format(buffer))
 
-        return buffer.strip()
+        return buffer
 
     def sign(self, bytes, key_name):
         response = self.send_request(" sign bytes 0x03{} for {}".format(bytes, key_name))
