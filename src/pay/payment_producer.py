@@ -155,6 +155,14 @@ class PaymentProducer(threading.Thread):
     def try_to_pay(self, payment_cycle):
         try:
             logger.info("Payment cycle is " + str(payment_cycle))
+
+            # 0- check for past payment evidence for current cycle
+            past_payment_state = check_past_payment(self.payments_root, payment_cycle)
+
+            if not self.dry_run and past_payment_state:
+                logger.warn(past_payment_state)
+                return True
+
             # 1- get reward data
             reward_model = self.reward_api.get_rewards_for_cycle_map(payment_cycle, verbose=self.verbose)
             # 2- calculate rewards
@@ -162,17 +170,9 @@ class PaymentProducer(threading.Thread):
             # set cycle info
             for rl in reward_logs: rl.cycle = payment_cycle
             total_amount_to_pay = sum([rl.amount for rl in reward_logs if rl.payable])
-            # 3- check for past payment evidence for current cycle
-            past_payment_state = check_past_payment(self.payments_root, payment_cycle)
-
-            already_paid = False
-
-            if not self.dry_run and total_amount_to_pay > 0 and past_payment_state:
-                logger.warn(past_payment_state)
-                already_paid = True
 
             # 4- if total_rewards > 0, proceed with payment
-            if total_amount_to_pay > 0 and not already_paid:
+            if total_amount_to_pay > 0:
                 report_file_path = get_calculation_report_file(self.calculations_dir, payment_cycle)
 
                 # 5- send to payment consumer
