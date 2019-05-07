@@ -4,7 +4,7 @@ from log_config import main_logger
 from model.reward_provider_model import RewardProviderModel
 from tzscan.mirror_selection_helper import TzScanMirrorSelector
 from util.cmd_mngr import CommandManager
-from util.rpc_utils import parse_json_response
+from util.rpc_utils import parse_json_response, extract_json_part
 from tzscan.tzscan_reward_api import TzScanRewardApiImpl
 
 logger = main_logger
@@ -132,7 +132,7 @@ class RpcRewardApiImpl(RewardApi):
             level_snapshot_block = (cycle - self.preserved_cycles - 2) * self.blocks_per_cycle + ( chosen_snapshot + 1) * self.blocks_per_roll_snapshot
             request = COMM_BLOCK.format(self.node_url, head_hash, current_level - level_snapshot_block)
             comm_block_response = self.wllt_clnt_mngr.send_request(request).rstrip()
-            comm_block_response_json = parse_json_response(comm_block_response)
+            comm_block_response_json = extract_json_part(comm_block_response, verbose=True)
             cmd_mngr = CommandManager(verbose=True)
             hash_snapshot_block = cmd_mngr.send_request("echo '{}' | jq -r .hash".format(comm_block_response_json))
 
