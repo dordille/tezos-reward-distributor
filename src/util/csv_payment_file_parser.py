@@ -22,10 +22,11 @@ class CsvPaymentFileParser:
         except ValueError as ve:
             raise Exception("Unable to read paid value.") from ve
 
-        rl =  RewardLog(row["address"], row["type"], None)
+        rl = RewardLog(row["address"], row["type"], None)
         rl.cycle = cyle
         rl.amount = int(row["amount"])
         rl.hash = row["hash"]
+        rl.balance = 0 if rl.balance == None else rl.balance
         rl.paid = paid
 
         return rl
