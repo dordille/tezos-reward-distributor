@@ -93,6 +93,13 @@ class PaymentConsumer(threading.Thread):
                 # 3- do the payment
                 payment_logs, total_attempts = batch_payer.pay(payment_items, self.verbose, dry_run=self.dry_run)
 
+                #total_attempts = 1
+                #payment_logs = []
+                #for pl in payment_items:
+                #    pl.paid=True
+                #    pl.hash='132'
+                #    payment_logs.append(pl)
+
                 # 4- count failed payments
                 nb_failed = count_and_log_failed(payment_logs, pymnt_cycle)
 
@@ -147,8 +154,7 @@ class PaymentConsumer(threading.Thread):
                 if pl.type == TYPE_MERGED and pl.parents:
                     for ppl in pl.parents:
                         csv_writer.writerow(
-                            [ppl.address, ppl.type, ppl.amount, pl.hash if pl.hash else "None", "1" if pl.paid else "0",
-                             pl.address])
+                            [ppl.address, ppl.type, ppl.amount, pl.hash if pl.hash else "None", "-1", pl.address])
 
                 logger.debug("Payment done for address %s type %s amount {:>8.2f} paid %s".format(pl.amount / MUTEZ),
                              pl.address, pl.type, pl.paid)

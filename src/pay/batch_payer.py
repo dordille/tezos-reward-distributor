@@ -94,7 +94,7 @@ class BatchPayer():
 
         if payment_logs:
             for pl in payment_logs:
-                logger.info("Reward already paid for cycle %s address %s amount %f tz type %s",
+                logger.debug("Reward already paid for cycle %s address %s amount %f tz type %s",
                             pl.cycle, pl.address, pl.payment, pl.type)
 
         # split payments into lists of MAX_TX_PER_BLOCK or less size
@@ -110,8 +110,6 @@ class BatchPayer():
                      format(len(payment_items), len(payment_items_chunks)))
 
         total_attempts = 0
-
-        payment_logs = []
         op_counter = OpCounter()
 
         for i_batch, payment_items_chunk in enumerate(payment_items_chunks):
