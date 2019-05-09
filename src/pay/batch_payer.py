@@ -95,7 +95,7 @@ class BatchPayer():
         if payment_logs:
             for pl in payment_logs:
                 logger.debug("Reward already paid for cycle %s address %s amount %f tz type %s",
-                            pl.cycle, pl.address, pl.payment, pl.type)
+                            pl.cycle, pl.address, pl.amount, pl.type)
 
         # split payments into lists of MAX_TX_PER_BLOCK or less size
         # [list_of_size_MAX_TX_PER_BLOCK,list_of_size_MAX_TX_PER_BLOCK,list_of_size_MAX_TX_PER_BLOCK,...]
