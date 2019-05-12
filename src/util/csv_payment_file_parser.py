@@ -13,7 +13,9 @@ class CsvPaymentFileParser:
             dict_rows = [{key: value for key, value in row.items()} for row in
                          csv.DictReader(f, delimiter='\t', skipinitialspace=True)]
 
-            return [self.FromPaymentCSVDictRow(row, cycle) for row in dict_rows]
+            records = [self.FromPaymentCSVDictRow(row, cycle) for row in dict_rows]
+
+            return records
 
     def FromPaymentCSVDictRow(self, row, cyle):
         try:
@@ -25,8 +27,9 @@ class CsvPaymentFileParser:
         rl = RewardLog(row["address"], row["type"], None)
         rl.cycle = cyle
         rl.amount = int(row["amount"])
-        rl.hash = row["hash"]
+        rl.hash = None if row["hash"] == 'None' else row["hash"]
         rl.balance = 0 if rl.balance == None else rl.balance
         rl.paid = paid
+        rl.child = None if row["child"] == 'None' else row["child"]
 
         return rl

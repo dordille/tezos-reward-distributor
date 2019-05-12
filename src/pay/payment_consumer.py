@@ -143,7 +143,7 @@ class PaymentConsumer(threading.Thread):
 
         with open(report_file, "w") as f:
             csv_writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csv_writer.writerow(["address", "type", "amount", "hash", "paid", "parent"])
+            csv_writer.writerow(["address", "type", "amount", "hash", "paid", "child"])
 
             for pl in payment_logs:
                 # write row to csv file
