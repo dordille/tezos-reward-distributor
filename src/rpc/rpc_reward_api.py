@@ -125,6 +125,12 @@ class RpcRewardApiImpl(RewardApi):
 
         level_for_snapshot_request = (cycle - self.preserved_cycles) * self.blocks_per_cycle + 1
 
+        logger.debug("Current level {}, head hash {}".format(current_level, head_hash))
+        logger.debug("cycle {}, preserved cycles {}, blocks per cycle {}, level of interest {}".format(cycle,
+                                                                                                       self.preserved_cycles,
+                                                                                                       self.blocks_per_cycle,
+                                                                                                       level_for_snapshot_request))
+
         if current_level - level_for_snapshot_request >= 0:
             request = COMM_SNAPSHOT.format(self.node_url, head_hash, current_level - level_for_snapshot_request, cycle)
             response = self.wllt_clnt_mngr.send_request(request)
