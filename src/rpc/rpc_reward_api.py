@@ -48,8 +48,12 @@ class RpcRewardApiImpl(RewardApi):
 
         current_level, head_hash = self.__get_current_level(verbose)
 
+        logger.debug("Current level {}, head hash {}".format(current_level,  head_hash))
+
         # Get last block in cycle where rewards are unfrozen
         level_for_relevant_request = (cycle + self.preserved_cycles + 1) * self.blocks_per_cycle
+
+        logger.debug("cycle {}, preserved cycles {}, blocks per cycle {}, level of interest {}".format(cycle, self.preserved_cycles, self.blocks_per_cycle, level_for_relevant_request))
 
         if current_level - level_for_relevant_request >= 0:
             request_metadata = COMM_BLOCK.format(self.node_url, head_hash, current_level - level_for_relevant_request) + '/metadata/'
