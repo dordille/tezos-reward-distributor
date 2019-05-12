@@ -36,7 +36,7 @@ class TzScanRewardProviderHelper:
         if verbose:
             logger.debug("Requesting {}".format(uri))
 
-        resp = requests.get(uri)
+        resp = requests.get(uri, timeout=5)
         if resp.status_code != 200:
             # This means something went wrong.
             raise TzScanException('GET {} {}'.format(uri, resp.status_code))
@@ -65,7 +65,7 @@ class TzScanRewardProviderHelper:
             if verbose:
                 logger.debug("Requesting {}".format(uri))
 
-            resp = requests.get(uri)
+            resp = requests.get(uri, timeout=5)
 
             if verbose:
                 logger.debug("Response from tzscan is {}".format(resp))

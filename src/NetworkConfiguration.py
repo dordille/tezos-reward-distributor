@@ -47,7 +47,7 @@ def get_network_config_from_local_node(config_client_manager, node_addr):
 
 def get_network_config_from_public_node(network_name):
     url = URL.format(url_prefix[network_name])
-    response_constants = requests.get(url)
+    response_constants = requests.get(url, timeout=5)
     constants = response_constants.json()
     network_config_map = parse_constants(constants)
     return network_config_map

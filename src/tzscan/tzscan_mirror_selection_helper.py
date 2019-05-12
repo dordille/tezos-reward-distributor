@@ -50,6 +50,6 @@ class TzScanMirrorSelector:
         uri = nb_delegators_api[self.nw_name]['API_URL']
         uri = uri.replace("%MIRROR%", str(mirror))
 
-        resp = requests.get(uri)
+        resp = requests.get(uri, timeout=5)
 
         return resp.status_code == 200
