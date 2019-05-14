@@ -43,20 +43,23 @@ class RpcRewardApiImpl(RewardApi):
 
         reward_data = {}
 
-        reward_data["delegate_staking_balance"], reward_data["delegators"] = self.__get_delegators_and_delgators_balance(cycle)
+        reward_data["delegate_staking_balance"], reward_data[
+            "delegators"] = self.__get_delegators_and_delgators_balance(cycle)
         reward_data["delegators_nb"] = len(reward_data["delegators"])
 
         current_level, head_hash = self.__get_current_level(verbose)
 
-        logger.debug("Current level {}, head hash {}".format(current_level,  head_hash))
+        logger.debug("Current level {}, head hash {}".format(current_level, head_hash))
 
         # Get last block in cycle where rewards are unfrozen
         level_for_relevant_request = (cycle + self.preserved_cycles + 1) * self.blocks_per_cycle
 
-        logger.debug("cycle {}, preserved cycles {}, blocks per cycle {}, level of interest {}".format(cycle, self.preserved_cycles, self.blocks_per_cycle, level_for_relevant_request))
+        logger.debug("Cycle {}, preserved cycles {}, blocks per cycle {}, level of interest {}"
+                     .format(cycle, self.preserved_cycles, self.blocks_per_cycle, level_for_relevant_request))
 
         if current_level - level_for_relevant_request >= 0:
-            request_metadata = COMM_BLOCK.format(self.node_url, head_hash, current_level - level_for_relevant_request) + '/metadata/'
+            request_metadata = COMM_BLOCK.format(self.node_url, head_hash,
+                                                 current_level - level_for_relevant_request) + '/metadata/'
             response_metadata = self.wllt_clnt_mngr.send_request(request_metadata)
             metadata = parse_json_response(response_metadata)
             balance_updates = metadata["balance_updates"]
@@ -76,7 +79,8 @@ class RpcRewardApiImpl(RewardApi):
             logger.warn("Please wait until the rewards and fees for cycle {} are unfrozen".format(cycle))
             reward_data["total_rewards"] = 0
 
-        reward_model = RewardProviderModel(reward_data["delegate_staking_balance"], reward_data["total_rewards"], reward_data["delegators"])
+        reward_model = RewardProviderModel(reward_data["delegate_staking_balance"], reward_data["total_rewards"],
+                                           reward_data["delegators"])
 
         if self.validate:
             self.__validate_reward_data(reward_model, cycle)
@@ -113,7 +117,9 @@ class RpcRewardApiImpl(RewardApi):
                 response = parse_json_response(response)
                 delegators[delegator] = int(response["balance"])
 
-                logger.debug("Delegator info ({}/{}) fetched: address {}, balance {}".format(idx, len(delegators_addresses), delegator, delegators[delegator]))
+                logger.debug(
+                    "Delegator info ({}/{}) fetched: address {}, balance {}".format(idx, len(delegators_addresses),
+                                                                                    delegator, delegators[delegator]))
         except:
             logger.warn('No delegators or unexpected error', exc_info=True)
 
@@ -126,10 +132,8 @@ class RpcRewardApiImpl(RewardApi):
         level_for_snapshot_request = (cycle - self.preserved_cycles) * self.blocks_per_cycle + 1
 
         logger.debug("Current level {}, head hash {}".format(current_level, head_hash))
-        logger.debug("cycle {}, preserved cycles {}, blocks per cycle {}, level of interest {}".format(cycle,
-                                                                                                       self.preserved_cycles,
-                                                                                                       self.blocks_per_cycle,
-                                                                                                       level_for_snapshot_request))
+        logger.debug("Cycle {}, preserved cycles {}, blocks per cycle {}, level of interest {}"
+                     .format(cycle, self.preserved_cycles, self.blocks_per_cycle, level_for_snapshot_request))
 
         if current_level - level_for_snapshot_request >= 0:
             request = COMM_SNAPSHOT.format(self.node_url, head_hash, current_level - level_for_snapshot_request, cycle)
@@ -139,7 +143,8 @@ class RpcRewardApiImpl(RewardApi):
             if len(snapshots) == 1:
                 chosen_snapshot = snapshots[0]
             else:
-                logger.info("Too few or too many possible snapshots found!")
+                logger.error("Too few or too many possible snapshots found!")
+                return ""
 
             level_snapshot_block = (cycle - self.preserved_cycles - 2) * self.blocks_per_cycle + ( chosen_snapshot + 1) * self.blocks_per_roll_snapshot
             request = COMM_BLOCK.format(self.node_url, head_hash, current_level - level_snapshot_block)
