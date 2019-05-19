@@ -111,11 +111,7 @@ class PaymentConsumer(threading.Thread):
                 report_file = self.create_payment_report(nb_failed, payment_logs, pymnt_cycle, total_attempts)
 
                 # 6- Clean failure reports
-                # remove file failed/cycle.csv.BUSY file;
-                #  - if payment attempt was successful it is not needed anymore,
-                #  - if payment attempt was un-successful, new failedY/cycle.csv is already created.
-                # Thus  failed/cycle.csv.BUSY file is not needed and removing it is fine.
-                self.clean_failed_payment_reports(pymnt_cycle)
+                self.clean_failed_payment_reports(pymnt_cycle, nb_failed == 0)
 
                 # 7- notify back producer
                 if nb_failed == 0:
@@ -136,14 +132,19 @@ class PaymentConsumer(threading.Thread):
 
         return
 
-    def clean_failed_payment_reports(self, payment_cycle):
+    def clean_failed_payment_reports(self, payment_cycle, success):
         # 1- generate path of a assumed failure report file
-        # if it exists, remove it
+        # if it exists and payments were successful, remove it
         failure_report_file = payment_report_file_path(self.payments_dir, payment_cycle, 1)
-        if os.path.isfile(failure_report_file):
+        if success and os.path.isfile(failure_report_file):
             os.remove(failure_report_file)
         # 2- generate path of a assumed busy failure report file
         # if it exists, remove it
+        ###
+        # remove file failed/cycle.csv.BUSY file;
+        #  - if payment attempt was successful it is not needed anymore,
+        #  - if payment attempt was un-successful, new failedY/cycle.csv is already created.
+        # Thus  failed/cycle.csv.BUSY file is not needed and removing it is fine.
         failure_report_busy_file = get_busy_file(failure_report_file)
         if os.path.isfile(failure_report_busy_file):
             os.remove(failure_report_busy_file)
