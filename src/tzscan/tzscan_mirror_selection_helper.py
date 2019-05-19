@@ -1,6 +1,7 @@
 import random
 
 import requests
+from requests import ReadTimeout, ConnectTimeout
 
 from log_config import main_logger
 
@@ -49,7 +50,10 @@ class TzScanMirrorSelector:
     def validate_mirror(self, mirror):
         uri = nb_delegators_api[self.nw_name]['API_URL']
         uri = uri.replace("%MIRROR%", str(mirror))
-
-        resp = requests.get(uri, timeout=5)
-
+        try:
+            resp = requests.get(uri, timeout=5)
+        except ReadTimeout:
+            return False
+        except ConnectTimeout:
+            return False
         return resp.status_code == 200

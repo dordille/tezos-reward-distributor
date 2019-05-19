@@ -4,14 +4,16 @@ import os
 import threading
 import time
 
+from time import sleep
 from Constants import RunMode
-from calc.phased_payment_calculator import PhasedPaymentCalculator
-from exception.tzscan import TzScanException
 from log_config import main_logger
 from model.reward_log import RewardLog
 from model.rules_model import RulesModel
+from exception.tzscan import TzScanException
+from requests import ReadTimeout, ConnectTimeout
 from pay.double_payment_check import check_past_payment
 from util.csv_payment_file_parser import CsvPaymentFileParser
+from calc.phased_payment_calculator import PhasedPaymentCalculator
 from util.dir_utils import get_calculation_report_file, get_failed_payments_dir, PAYMENT_FAILED_DIR, PAYMENT_DONE_DIR, \
     remove_busy_file, BUSY_FILE
 
@@ -57,24 +59,56 @@ class PaymentProducer(threading.Thread):
 
         self.payment_calc = PhasedPaymentCalculator(self.founders_map, self.owners_map, self.fee_calc,
                                                     self.min_delegation_amt_in_mutez, self.rules_model)
-        logger.info('Producer started')
+
+        self.retry_fail_thread = threading.Thread(target=self.retry_fail_run, name=self.name + "_retry_fail")
+        self.retry_fail_event = threading.Event()
+
+        logger.info('Producer "{}" started'.format(self.name))
 
     def exit(self):
         if not self.exiting:
             self.payments_queue.put([self.create_exit_payment()])
             self.exiting = True
 
-            _thread.interrupt_main()
+            if self.life_cycle.is_running():
+                _thread.interrupt_main()
+
+            if self.retry_fail_event:
+                self.retry_fail_event.set()
+
+    def retry_fail_run(self):
+        logger.info('Retry Fail thread "{}" started'.format(self.retry_fail_thread.name))
+
+        sleep(60)  # producer thread already tried once, wait for next try
+
+        while not self.exiting and self.life_cycle.is_running():
+            self.retry_failed_payments()
+            try:
+                # this will either return with timeout or set from parent producer thread
+                self.retry_fail_event.wait(60)  # 1 hour
+            except RuntimeError:
+                pass
+
+        pass
 
     def run(self):
-        current_cycle = self.block_api.get_current_cycle()
-        payment_cycle = self.initial_payment_cycle
+        # call first retry if not in onetime mode.
+        # retry_failed script is more suitable for one time cases.
+        if not self.run_mode == RunMode.ONETIME:
+            self.retry_failed_payments()
+
+        # first retry is done by producer thread, start retry thread for further retries
+        if self.run_mode == RunMode.FOREVER:
+            self.retry_fail_thread.start()
+
+        crrnt_cycle = self.block_api.get_current_cycle()
+        pymnt_cycle = self.initial_payment_cycle
 
         # if non-positive initial_payment_cycle, set initial_payment_cycle to
         # 'current cycle - abs(initial_cycle) - (NB_FREEZE_CYCLE+1)'
         if self.initial_payment_cycle <= 0:
-            payment_cycle = current_cycle - abs(self.initial_payment_cycle) - (self.nw_config['NB_FREEZE_CYCLE'] + 1)
-            logger.debug("Payment cycle is set to {}".format(payment_cycle))
+            pymnt_cycle = crrnt_cycle - abs(self.initial_payment_cycle) - (self.nw_config['NB_FREEZE_CYCLE'] + 1)
+            logger.debug("Payment cycle is set to {}".format(pymnt_cycle))
 
         while not self.exiting and self.life_cycle.is_running():
 
@@ -83,7 +117,7 @@ class PaymentProducer(threading.Thread):
 
             try:
                 current_level = self.block_api.get_current_level(verbose=self.verbose)
-                current_cycle = self.block_api.level_to_cycle(current_level)
+                crrnt_cycle = self.block_api.level_to_cycle(current_level)
 
                 # create reports dir
                 if self.calculations_dir and not os.path.exists(self.calculations_dir):
@@ -92,14 +126,14 @@ class PaymentProducer(threading.Thread):
                 logger.debug("Checking for pending payments : payment_cycle <= "
                              "current_cycle - (self.nw_config['NB_FREEZE_CYCLE'] + 1) - self.release_override")
                 logger.info("Checking for pending payments : checking {} <= {} - ({} + 1) - {}".
-                            format(payment_cycle, current_cycle, self.nw_config['NB_FREEZE_CYCLE'],
+                            format(pymnt_cycle, crrnt_cycle, self.nw_config['NB_FREEZE_CYCLE'],
                                    self.release_override))
 
                 # payments should not pass beyond last released reward cycle
-                if payment_cycle <= current_cycle - (self.nw_config['NB_FREEZE_CYCLE'] + 1) - self.release_override:
+                if pymnt_cycle <= crrnt_cycle - (self.nw_config['NB_FREEZE_CYCLE'] + 1) - self.release_override:
                     if not self.payments_queue.full():
 
-                        result = self.try_to_pay(payment_cycle)
+                        result = self.try_to_pay(pymnt_cycle)
 
                         if result:
                             # single run is done. Do not continue.
@@ -108,7 +142,7 @@ class PaymentProducer(threading.Thread):
                                 self.exit()
                                 break
                             else:
-                                payment_cycle = payment_cycle + 1
+                                pymnt_cycle = pymnt_cycle + 1
 
                     # end of queue size check
                     else:
@@ -117,8 +151,7 @@ class PaymentProducer(threading.Thread):
                         time.sleep(60 * 3)
                 # end of payment cycle check
                 else:
-                    logger.info("No pending payments for cycle {}, current cycle is {}".
-                                format(payment_cycle, current_cycle))
+                    logger.info("No pending payments for cycle {},current cycle is {}".format(pymnt_cycle, crrnt_cycle))
 
                     # pending payments done. Do not wait any more.
                     if self.run_mode == RunMode.PENDING:
@@ -128,17 +161,15 @@ class PaymentProducer(threading.Thread):
 
                     time.sleep(10)
 
-                    self.retry_failed_payments()
-
                     # calculate number of blocks until end of current cycle
-                    nb_blocks_remaining = (current_cycle + 1) * self.nw_config['BLOCKS_PER_CYCLE'] - current_level
+                    nb_blocks_remaining = (crrnt_cycle + 1) * self.nw_config['BLOCKS_PER_CYCLE'] - current_level
                     # plus offset. cycle beginnings may be busy, move payments forward
                     nb_blocks_remaining = nb_blocks_remaining + self.payment_offset
 
                     logger.debug("Wait until next cycle, for {} blocks".format(nb_blocks_remaining))
 
                     # wait until current cycle ends
-                    self.waint_until_next_cycle(nb_blocks_remaining)
+                    self.wait_until_next_cycle(nb_blocks_remaining)
 
             except TzScanException:
                 logger.warn("Tzscan error at reward loop", exc_info=True)
@@ -153,28 +184,28 @@ class PaymentProducer(threading.Thread):
 
         return
 
-    def try_to_pay(self, payment_cycle):
+    def try_to_pay(self, pymnt_cycle):
         try:
-            logger.info("Payment cycle is " + str(payment_cycle))
+            logger.info("Payment cycle is " + str(pymnt_cycle))
 
             # 0- check for past payment evidence for current cycle
-            past_payment_state = check_past_payment(self.payments_root, payment_cycle)
+            past_payment_state = check_past_payment(self.payments_root, pymnt_cycle)
 
             if not self.dry_run and past_payment_state:
                 logger.warn(past_payment_state)
                 return True
 
             # 1- get reward data
-            reward_model = self.reward_api.get_rewards_for_cycle_map(payment_cycle, verbose=self.verbose)
+            reward_model = self.reward_api.get_rewards_for_cycle_map(pymnt_cycle, verbose=self.verbose)
             # 2- calculate rewards
             reward_logs, total_amount = self.payment_calc.calculate(reward_model)
             # set cycle info
-            for rl in reward_logs: rl.cycle = payment_cycle
+            for rl in reward_logs: rl.cycle = pymnt_cycle
             total_amount_to_pay = sum([rl.amount for rl in reward_logs if rl.payable])
 
             # 4- if total_rewards > 0, proceed with payment
             if total_amount_to_pay > 0:
-                report_file_path = get_calculation_report_file(self.calculations_dir, payment_cycle)
+                report_file_path = get_calculation_report_file(self.calculations_dir, pymnt_cycle)
 
                 # 5- send to payment consumer
                 self.payments_queue.put(reward_logs)
@@ -184,18 +215,21 @@ class PaymentProducer(threading.Thread):
                 logger.debug("Creating calculation report (%s)", report_file_path)
 
                 # 6- create calculations report file. This file contains calculations details
-                self.create_calculations_report(payment_cycle, reward_logs, report_file_path,
-                                                total_amount)
+                self.create_calculations_report(pymnt_cycle, reward_logs, report_file_path, total_amount)
                 # 7- next cycle
                 # processing of cycle is done
-                logger.info(
-                    "Reward creation is done for cycle {}, {} payments.".format(payment_cycle, len(reward_logs)))
+                logger.info("Reward creation is done for cycle {}, {} payments.".format(pymnt_cycle, len(reward_logs)))
 
             elif total_amount_to_pay == 0:
                 logger.info("Total payment amount is 0. Nothing to pay!")
 
             return True
-
+        except ReadTimeout:
+            logger.warn("Tzscan call failed", exc_info=True)
+            return False
+        except ConnectTimeout:
+            logger.warn("Tzscan connection failed", exc_info=True)
+            return False
         except TzScanException:
             logger.warn("Tzscan error at reward loop", exc_info=True)
             return False
@@ -203,13 +237,13 @@ class PaymentProducer(threading.Thread):
             logger.error("Error at payment producer loop", exc_info=True)
             return False
 
-    def waint_until_next_cycle(self, nb_blocks_remaining):
+    def wait_until_next_cycle(self, nb_blocks_remaining):
         for x in range(nb_blocks_remaining):
             time.sleep(self.nw_config['BLOCK_TIME_IN_SEC'])
 
             # if shutting down, exit
             if not self.life_cycle.is_running():
-                self.payments_queue.put([self.create_exit_payment()])
+                self.exit()
                 break
 
     def create_calculations_report(self, payment_cycle, payment_logs, report_file_path, total_rewards):
@@ -254,7 +288,7 @@ class PaymentProducer(threading.Thread):
         return RewardLog.ExitInstance()
 
     def retry_failed_payments(self):
-        logger.info("retry_failed_payments started")
+        logger.debug("retry_failed_payments started")
 
         # 1 - list csv files under payments/failed directory
         # absolute path of csv files found under payments_root/failed directory
@@ -262,7 +296,10 @@ class PaymentProducer(threading.Thread):
         payment_reports_failed = [os.path.join(failed_payments_dir, x) for x in
                                   os.listdir(failed_payments_dir) if x.endswith('.csv')]
 
-        logger.debug("Trying failed payments : '{}'".format(",".join(payment_reports_failed)))
+        if payment_reports_failed:
+            logger.debug("Failed payment files found are: '{}'".format(",".join(payment_reports_failed)))
+        else:
+            logger.debug("No failed payment files found under directory '{}'".format(failed_payments_dir))
 
         # 2- for each csv file with name csv_report.csv
         for payment_failed_report_file in payment_reports_failed:
