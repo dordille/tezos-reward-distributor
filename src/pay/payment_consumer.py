@@ -110,17 +110,22 @@ class PaymentConsumer(threading.Thread):
                 # 5- create payment report file
                 report_file = self.create_payment_report(nb_failed, payment_logs, pymnt_cycle, total_attempts)
 
-                # 6- upon successful payment, clean failure reports
-                # note that failed payment reports are cleaned after creation of successful payment report
+                # 6- Clean failure reports
+                # remove file failed/cycle.csv.BUSY file;
+                #  - if payment attempt was successful it is not needed anymore,
+                #  - if payment attempt was un-successful, new failedY/cycle.csv is already created.
+                # Thus  failed/cycle.csv.BUSY file is not needed and removing it is fine.
+                self.clean_failed_payment_reports(pymnt_cycle)
+
+                # 7- notify back producer
                 if nb_failed == 0:
-                    self.clean_failed_payment_reports(pymnt_cycle)
                     if payment_batch.producer_ref:
                         payment_batch.producer_ref.on_success(payment_batch)
                 else:
                     if payment_batch.producer_ref:
                         payment_batch.producer_ref.on_fail(payment_batch)
 
-                # 7- send email
+                # 8- send email
                 if not self.dry_run:
                     self.mm.send_payment_mail(pymnt_cycle, report_file, nb_failed)
 
