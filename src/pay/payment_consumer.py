@@ -157,7 +157,7 @@ class PaymentConsumer(threading.Thread):
         logger.debug("Creating payment report (%s)", report_file)
 
         with open(report_file, "w") as f:
-            csv_writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            csv_writer = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             csv_writer.writerow(["address", "type", "amount", "hash", "paid"])
 
             for pl in payment_logs:

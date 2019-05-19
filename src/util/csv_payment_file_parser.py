@@ -11,7 +11,7 @@ class CsvPaymentFileParser:
         with open(payment_failed_report_file) as f:
             # read csv into list of dictionaries
             dict_rows = [{key: value for key, value in row.items()} for row in
-                         csv.DictReader(f, delimiter='\t', skipinitialspace=True)]
+                         csv.DictReader(f, delimiter=',', skipinitialspace=True)]
 
             records = [self.FromPaymentCSVDictRow(row, cycle) for row in dict_rows]
 
