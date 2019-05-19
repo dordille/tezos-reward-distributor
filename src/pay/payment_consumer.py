@@ -168,15 +168,9 @@ class PaymentConsumer(threading.Thread):
                              pl.address, pl.type, pl.paid)
 
         if self.publish_stats and not self.dry_run and (not self.args or self.args.network == 'MAINNET'):
-            n_f_type = len([pl for pl in payment_logs if pl.type == TYPE_FOUNDER] +
-                           [p for pl in payment_logs if pl.type == TYPE_MERGED for p in pl.parents if
-                            p.type == TYPE_FOUNDER])
-            n_o_type = len([pl for pl in payment_logs if pl.type == TYPE_OWNER] +
-                           [p for pl in payment_logs if pl.type == TYPE_MERGED for p in pl.parents if
-                            p.type == TYPE_OWNER])
-            n_d_type = len([pl for pl in payment_logs if pl.type == TYPE_DELEGATOR] +
-                           [p for pl in payment_logs if pl.type == TYPE_MERGED for p in pl.parents if
-                            p.type == TYPE_DELEGATOR])
+            n_f_type = len([pl for pl in payment_logs if pl.type == TYPE_FOUNDER])
+            n_o_type = len([pl for pl in payment_logs if pl.type == TYPE_OWNER])
+            n_d_type = len([pl for pl in payment_logs if pl.type == TYPE_DELEGATOR])
             n_m_type = len([pl for pl in payment_logs if pl.type == TYPE_MERGED])
 
             stats_dict = {}
