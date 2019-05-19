@@ -313,8 +313,7 @@ class PaymentProducer(threading.Thread, PaymentProducerABC):
             if os.path.isfile(payment_failed_report_file.replace(PAYMENT_FAILED_DIR, PAYMENT_DONE_DIR)):
                 # remove payments/failed/csv_report.csv
                 os.remove(payment_failed_report_file)
-                logger.info(
-                    "Payment for failed payment {} is already done. Removing.".format(payment_failed_report_file))
+                logger.info("Payment for failed payment {} is already done. Removing.".format(payment_failed_report_file))
 
                 # remove payments/failed/csv_report.csv.BUSY
                 # if there is a busy failed payment report file, remove it.

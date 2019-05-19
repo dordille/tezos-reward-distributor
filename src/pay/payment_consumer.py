@@ -153,18 +153,11 @@ class PaymentConsumer(threading.Thread):
 
         with open(report_file, "w") as f:
             csv_writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csv_writer.writerow(["address", "type", "amount", "hash", "paid", "child"])
+            csv_writer.writerow(["address", "type", "amount", "hash", "paid"])
 
             for pl in payment_logs:
                 # write row to csv file
-                csv_writer.writerow(
-                    [pl.address, pl.type, pl.amount, pl.hash if pl.hash else "None",
-                     "1" if pl.paid else "0", "None"])
-
-                if pl.type == TYPE_MERGED and pl.parents:
-                    for ppl in pl.parents:
-                        csv_writer.writerow(
-                            [ppl.address, ppl.type, ppl.amount, pl.hash if pl.hash else "None", "-1", pl.address])
+                csv_writer.writerow([pl.address, pl.type, pl.amount, pl.hash if pl.hash else "None", "1" if pl.paid else "0"])
 
                 logger.debug("Payment done for address %s type %s amount {:>8.2f} paid %s".format(pl.amount / MUTEZ),
                              pl.address, pl.type, pl.paid)

@@ -92,10 +92,11 @@ class BatchPayer():
 
         payment_items = [pi for pi in payment_items_in if not pi.paid]
 
-        if payment_logs:
-            for pl in payment_logs:
-                logger.debug("Reward already paid for cycle %s address %s amount %f tz type %s",
-                            pl.cycle, pl.address, pl.amount, pl.type)
+        self.log_paid_items(payment_logs)
+
+        if not payment_items:
+            logger.debug("No unpaid items found, returning...")
+            return payment_items_in, 0
 
         # split payments into lists of MAX_TX_PER_BLOCK or less size
         # [list_of_size_MAX_TX_PER_BLOCK,list_of_size_MAX_TX_PER_BLOCK,list_of_size_MAX_TX_PER_BLOCK,...]
@@ -123,6 +124,12 @@ class BatchPayer():
             total_attempts += attempt
 
         return payment_logs, total_attempts
+
+    def log_paid_items(self, payment_logs):
+        if payment_logs:
+            for pl in payment_logs:
+                logger.debug("Reward already paid for cycle %s address %s amount %f tz type %s",
+                             pl.cycle, pl.address, pl.amount, pl.type)
 
     def pay_single_batch_wrap(self, payment_items, op_counter, verbose=None, dry_run=None):
 

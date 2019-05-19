@@ -30,6 +30,6 @@ class CsvPaymentFileParser:
         rl.hash = None if row["hash"] == 'None' else row["hash"]
         rl.balance = 0 if rl.balance == None else rl.balance
         rl.paid = paid
-        rl.child = None if row["child"] == 'None' else row["child"]
+        # rl.child = None if row["child"] == 'None' else row["child"]
 
         return rl
