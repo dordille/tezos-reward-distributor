@@ -10,7 +10,11 @@ from cli.wallet_client_manager import WalletClientManager
 from config.config_parser import ConfigParser
 from config.yaml_conf_parser import YamlConfParser
 from log_config import main_logger
+from launch_common import print_banner, add_argument_network, add_argument_provider, add_argument_reports_dir, \
+    add_argument_config_dir, add_argument_node_addr, add_argument_dry, add_argument_dry_no_consumer, \
+    add_argument_executable_dirs, add_argument_docker, add_argument_verbose
 from model.reward_log import RewardLog
+from pay.payment_batch import PaymentBatch
 from pay.payment_consumer import PaymentConsumer
 from util.client_utils import get_client_path
 from util.dir_utils import get_payment_root, \
@@ -135,11 +139,10 @@ def main(args):
         payment_items.append(pi)
 
         logger.info("Reward created for cycle %s address %s amount %f fee %f tz type %s",
-                    pi.cycle, pi.address, pi.payment, pi.fee,
-                    pi.type)
+                    pi.cycle, pi.address, pi.payment, pi.fee, pi.type)
 
-    payments_queue.put(payment_items)
-    payments_queue.put([RewardLog.ExitInstance()])
+    payments_queue.put(PaymentBatch(None, 0, payment_items))
+    payments_queue.put(PaymentBatch(None, 0, [RewardLog.ExitInstance()]))
 
 
 def get_baking_configuration_file(config_dir):
@@ -180,41 +183,28 @@ if __name__ == '__main__':
     if sys.version_info[0] < 3:
         raise Exception("Must be using Python 3")
 
+
     parser = argparse.ArgumentParser()
+    add_argument_network(parser)
+    add_argument_provider(parser)
+    add_argument_reports_dir(parser)
+    add_argument_config_dir(parser)
+    add_argument_node_addr(parser)
+    add_argument_dry(parser)
+    add_argument_dry_no_consumer(parser)
+    add_argument_executable_dirs(parser)
+    add_argument_docker(parser)
+    add_argument_verbose(parser)
+
     parser.add_argument("paymentaddress",
                         help="tezos account address (PKH) or an alias to make payments. If tezos signer is used "
                              "to sign for the address, it is necessary to use an alias.")
     parser.add_argument("payments_file", help="File of payment lines. Each line should contain PKH:amount. "
                                               "For example: KT1QRZLh2kavAJdrQ6TjdhBgjpwKMRfwCBmQ:123.33")
-    parser.add_argument("-N", "--network", help="network name", choices=['ZERONET', 'ALPHANET', 'MAINNET'],
-                        default='MAINNET')
-    parser.add_argument("-r", "--reports_dir", help="Directory to create reports", default='~/pymnt/reports')
-    parser.add_argument("-f", "--config_dir", help="Directory to find baking configurations", default='~/pymnt/cfg')
-    parser.add_argument("-A", "--node_addr", help="Node host:port pair", default='127.0.0.1:8732')
-    parser.add_argument("-D", "--dry_run",
-                        help="Run without injecting payments. Suitable for testing. Does not require locking.",
-                        default=True)
-    parser.add_argument("-E", "--executable_dirs",
-                        help="Comma separated list of directories to search for client executable. Prefer single "
-                             "location when setting client directory. If -d is set, point to location where tezos docker "
-                             "script (e.g. mainnet.sh for mainnet) is found. Default value is given for minimum configuration effort.",
-                        default='~/,~/tezos')
-    parser.add_argument("-d", "--docker",
-                        help="Docker installation flag. When set, docker script location should be set in -E",
-                        action="store_true")
-    parser.add_argument("-V", "--verbose",
-                        help="Low level details.",
-                        action="store_true")
+
 
     args = parser.parse_args()
+    script_name = " - Pay For Script"
+    print_banner(args, script_name)
 
-    logger.info("Tezos Reward Distributor Manual Payment Script Starting")
-    logger.info(LINER)
-    logger.info("Copyright Hüseyin ABANOZ 2019")
-    logger.info("huseyinabanox@gmail.com")
-    logger.info("Please leave copyright information")
-    logger.info(LINER)
-    if args.dry_run:
-        logger.info("DRY RUN MODE")
-        logger.info(LINER)
     main(args)

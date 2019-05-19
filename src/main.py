@@ -16,6 +16,9 @@ from config.config_parser import ConfigParser
 from config.yaml_baking_conf_parser import BakingYamlConfParser
 from config.yaml_conf_parser import YamlConfParser
 from log_config import main_logger
+from launch_common import print_banner, add_argument_network, add_argument_provider, add_argument_reports_dir, \
+    add_argument_config_dir, add_argument_node_addr, add_argument_dry, add_argument_dry_no_consumer, \
+    add_argument_executable_dirs, add_argument_docker, add_argument_verbose
 from model.baking_conf import BakingConf
 from pay.payment_consumer import PaymentConsumer
 from pay.payment_producer import PaymentProducer
@@ -109,8 +112,8 @@ def main(args):
     logger.info(LINER)
 
     # 6- is it a reports run
-    dry_run = args.dry_run_no_payments or args.dry_run
-    if args.dry_run_no_payments:
+    dry_run = args.dry_run_no_consumers or args.dry_run
+    if args.dry_run_no_consumers:
         global NB_CONSUMERS
         NB_CONSUMERS = 0
 
@@ -208,33 +211,21 @@ if __name__ == '__main__':
         raise Exception("Must be using Python 3")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-N", "--network", help="network name", choices=['ZERONET', 'ALPHANET', 'MAINNET'],
-                        default='MAINNET')
-    parser.add_argument("-P", "--reward_data_provider", help="where reward data is provided", choices=['tzscan', 'rpc'],
-                        default='tzscan')
-    parser.add_argument("-r", "--reports_dir", help="Directory to create reports", default='~/pymnt/reports')
-    parser.add_argument("-f", "--config_dir", help="Directory to find baking configurations", default='~/pymnt/cfg')
-    parser.add_argument("-A", "--node_addr", help="Node host:port pair", default='127.0.0.1:8732')
-    parser.add_argument("-D", "--dry_run",
-                        help="Run without injecting payments. Suitable for testing. Does not require locking.",
-                        action="store_true")
-    parser.add_argument("-Dn", "--dry_run_no_payments",
-                        help="Run without doing any payments. Suitable for testing. Does not require locking.",
-                        action="store_true")
-    parser.add_argument("-E", "--executable_dirs",
-                        help="Comma separated list of directories to search for client executable. Prefer single "
-                             "location when setting client directory. If -d is set, point to location where tezos docker "
-                             "script (e.g. mainnet.sh for mainnet) is found. Default value is given for minimum configuration effort.",
-                        default='~/,~/tezos')
-    parser.add_argument("-d", "--docker",
-                        help="Docker installation flag. When set, docker script location should be set in -E",
-                        action="store_true")
+
+    add_argument_network(parser)
+    add_argument_provider(parser)
+    add_argument_reports_dir(parser)
+    add_argument_config_dir(parser)
+    add_argument_node_addr(parser)
+    add_argument_dry(parser)
+    add_argument_dry_no_consumer(parser)
+    add_argument_executable_dirs(parser)
+    add_argument_docker(parser)
+    add_argument_verbose(parser)
+
     parser.add_argument("-s", "--background_service",
                         help="Marker to indicate that TRD is running in daemon mode. "
                              "When not given it indicates that TRD is in interactive mode.",
-                        action="store_true")
-    parser.add_argument("-V", "--verbose",
-                        help="Low level details.",
                         action="store_true")
     parser.add_argument("-Dp", "--do_not_publish_stats",
                         help="Do not publish anonymous usage statistics",
@@ -260,14 +251,7 @@ if __name__ == '__main__':
                         type=int)
 
     args = parser.parse_args()
+    script_name = ""
+    print_banner(args, script_name)
 
-    logger.info("Tezos Reward Distributor is Starting")
-    logger.info(LINER)
-    logger.info("Copyright Huseyin ABANOZ 2019")
-    logger.info("huseyinabanox@gmail.com")
-    logger.info("Please leave copyright information")
-    logger.info(LINER)
-    if args.dry_run:
-        logger.info("DRY RUN MODE")
-        logger.info(LINER)
     main(args)
