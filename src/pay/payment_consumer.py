@@ -59,7 +59,9 @@ class PaymentConsumer(threading.Thread):
         while True:
             try:
                 # 1-  wait until a reward is present
-                payment_items = self.payments_queue.get(True)
+                payment_batch = self.payments_queue.get(True)
+
+                payment_items = payment_batch.batch
 
                 if len(payment_items) == 0:
                     logger.debug("Batch is empty, ignoring ...")
@@ -69,10 +71,9 @@ class PaymentConsumer(threading.Thread):
                     logger.warn("Exit signal received. Killing the thread...")
                     break
 
-                # each log in the batch belongs to the same cycle
-                pymnt_cycle = payment_items[0].cycle
-
                 time.sleep(1)
+
+                pymnt_cycle = payment_batch.cycle
 
                 logger.info("Starting payments for cycle {}".format(pymnt_cycle))
 
@@ -93,9 +94,12 @@ class PaymentConsumer(threading.Thread):
                 # 3- do the payment
                 payment_logs, total_attempts = batch_payer.pay(payment_items, self.verbose, dry_run=self.dry_run)
 
-                #total_attempts = 1
-                #payment_logs = []
-                #for pl in payment_items:
+                # override batch data
+                payment_batch.batch = payment_logs
+
+                # total_attempts = 1
+                # payment_logs = []
+                # for pl in payment_items:
                 #    pl.paid=True
                 #    pl.hash='132'
                 #    payment_logs.append(pl)
@@ -108,7 +112,13 @@ class PaymentConsumer(threading.Thread):
 
                 # 6- upon successful payment, clean failure reports
                 # note that failed payment reports are cleaned after creation of successful payment report
-                if nb_failed == 0: self.clean_failed_payment_reports(pymnt_cycle)
+                if nb_failed == 0:
+                    self.clean_failed_payment_reports(pymnt_cycle)
+                    if payment_batch.producer_ref:
+                        payment_batch.producer_ref.on_success(payment_batch)
+                else:
+                    if payment_batch.producer_ref:
+                        payment_batch.producer_ref.on_fail(payment_batch)
 
                 # 7- send email
                 if not self.dry_run:

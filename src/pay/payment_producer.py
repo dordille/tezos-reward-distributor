@@ -12,6 +12,8 @@ from model.rules_model import RulesModel
 from exception.tzscan import TzScanException
 from requests import ReadTimeout, ConnectTimeout
 from pay.double_payment_check import check_past_payment
+from pay.payment_batch import PaymentBatch
+from pay.payment_producer_abc import PaymentProducerABC
 from util.csv_payment_file_parser import CsvPaymentFileParser
 from calc.phased_payment_calculator import PhasedPaymentCalculator
 from util.dir_utils import get_calculation_report_file, get_failed_payments_dir, PAYMENT_FAILED_DIR, PAYMENT_DONE_DIR, \
@@ -22,7 +24,7 @@ logger = main_logger
 MUTEZ = 1e+6
 
 
-class PaymentProducer(threading.Thread):
+class PaymentProducer(threading.Thread, PaymentProducerABC):
     def __init__(self, name, initial_payment_cycle, network_config, payments_dir, calculations_dir, run_mode,
                  service_fee_calc, release_override, payment_offset, baking_cfg, payments_queue, life_cycle,
                  dry_run, wllt_clnt_mngr, node_url, provider_factory, verbose=False):
@@ -67,7 +69,7 @@ class PaymentProducer(threading.Thread):
 
     def exit(self):
         if not self.exiting:
-            self.payments_queue.put([self.create_exit_payment()])
+            self.payments_queue.put(PaymentBatch(self, 0, [self.create_exit_payment()]))
             self.exiting = True
 
             if self.life_cycle.is_running():
@@ -85,7 +87,7 @@ class PaymentProducer(threading.Thread):
             self.retry_failed_payments()
             try:
                 # this will either return with timeout or set from parent producer thread
-                self.retry_fail_event.wait(60)  # 1 hour
+                self.retry_fail_event.wait(60 * 60)  # 1 hour
             except RuntimeError:
                 pass
 
@@ -208,14 +210,14 @@ class PaymentProducer(threading.Thread):
                 report_file_path = get_calculation_report_file(self.calculations_dir, pymnt_cycle)
 
                 # 5- send to payment consumer
-                self.payments_queue.put(reward_logs)
+                self.payments_queue.put(PaymentBatch(self, pymnt_cycle, reward_logs))
                 # logger.info("Total payment amount is {:,} mutez. %s".format(total_amount_to_pay),
                 #            "" if self.delegator_pays_xfer_fee else "(Transfer fee is not included)")
 
                 logger.debug("Creating calculation report (%s)", report_file_path)
 
                 # 6- create calculations report file. This file contains calculations details
-                self.create_calculations_report(pymnt_cycle, reward_logs, report_file_path, total_amount)
+                self.create_calculations_report(reward_logs, report_file_path, total_amount)
                 # 7- next cycle
                 # processing of cycle is done
                 logger.info("Reward creation is done for cycle {}, {} payments.".format(pymnt_cycle, len(reward_logs)))
@@ -236,6 +238,8 @@ class PaymentProducer(threading.Thread):
         except Exception:
             logger.error("Error at payment producer loop", exc_info=True)
             return False
+        finally:
+            sleep(10)
 
     def wait_until_next_cycle(self, nb_blocks_remaining):
         for x in range(nb_blocks_remaining):
@@ -246,7 +250,7 @@ class PaymentProducer(threading.Thread):
                 self.exit()
                 break
 
-    def create_calculations_report(self, payment_cycle, payment_logs, report_file_path, total_rewards):
+    def create_calculations_report(self, payment_logs, report_file_path, total_rewards):
         with open(report_file_path, 'w', newline='') as f:
             writer = csv.writer(f, delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             # write headers and total rewards
@@ -331,9 +335,20 @@ class PaymentProducer(threading.Thread):
             batch = CsvPaymentFileParser().parse(payment_failed_report_file, cycle)
 
             # 2.4 put records into payment_queue. payment_consumer will make payments
-            self.payments_queue.put(batch)
+            self.payments_queue.put(PaymentBatch(self, cycle, batch))
 
             # 2.5 rename payments/failed/csv_report.csv to payments/failed/csv_report.csv.BUSY
             # mark the files as in use. we do not want it to be read again
             # BUSY file will be removed, if successful payment is done
             os.rename(payment_failed_report_file, payment_failed_report_file + BUSY_FILE)
+
+    def notify_retry_fail_thread(self):
+        self.retry_fail_event.set()
+
+    # upon success retry failed payments if present
+    # success may indicate what went wrong in past is fixed.
+    def on_success(self, pymnt_batch):
+        self.notify_retry_fail_thread()
+
+    def on_fail(self, pymnt_batch):
+        pass
