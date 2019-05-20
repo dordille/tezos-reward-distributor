@@ -5,7 +5,7 @@ from time import sleep
 import requests
 import version
 
-url = "http://34.74.27.213:8080/trd/stats/add"
+url = "http://35.211.164.111:8080/trd/stats/add"
 headers = {'content-type': 'application/json'}
 
 
