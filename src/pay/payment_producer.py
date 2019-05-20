@@ -85,7 +85,11 @@ class PaymentProducer(threading.Thread, PaymentProducerABC):
 
         while not self.exiting and self.life_cycle.is_running():
             self.retry_failed_payments()
+
             try:
+                # prepare to wait on event
+                self.retry_fail_event.clear()
+
                 # this will either return with timeout or set from parent producer thread
                 self.retry_fail_event.wait(60 * 60)  # 1 hour
             except RuntimeError:
@@ -313,7 +317,8 @@ class PaymentProducer(threading.Thread, PaymentProducerABC):
             if os.path.isfile(payment_failed_report_file.replace(PAYMENT_FAILED_DIR, PAYMENT_DONE_DIR)):
                 # remove payments/failed/csv_report.csv
                 os.remove(payment_failed_report_file)
-                logger.info("Payment for failed payment {} is already done. Removing.".format(payment_failed_report_file))
+                logger.info(
+                    "Payment for failed payment {} is already done. Removing.".format(payment_failed_report_file))
 
                 # remove payments/failed/csv_report.csv.BUSY
                 # if there is a busy failed payment report file, remove it.
