@@ -142,7 +142,11 @@ class BatchPayer():
         # due to unknown reasons, some times a batch fails to pre-apply
         # trying after some time should be OK
         for attempt in range(max_try):
-            return_code, operation_hash = self.pay_single_batch(payment_items, op_counter, verbose, dry_run=dry_run)
+            try:
+                return_code, operation_hash = self.pay_single_batch(payment_items, op_counter, verbose, dry_run=dry_run)
+            except:
+                logger.error("Single batch payment attempt {}/{} failed".format(attempt + 1, max_try), exc_info=True)
+                return_cod, operation_hash = False, ""
 
             if dry_run or not return_code:
                 op_counter.rollback()
