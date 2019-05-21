@@ -115,7 +115,7 @@ class WalletClientManager(SimpleClientManager):
 
         dict = self.parse_list_known_contracts_response(response)
 
-        for alias, pkh in dict:
+        for alias, pkh in dict.items():
             try:
                 AddressValidator("known_contract").validate(pkh)
             except Exception as e:
@@ -131,7 +131,7 @@ class WalletClientManager(SimpleClientManager):
 
         dict = self.parse_list_known_addresses_response(response)
 
-        for pkh, dict_alias_sk in dict:
+        for pkh, dict_alias_sk in dict.items():
             try:
                 AddressValidator("known_address").validate(pkh)
             except Exception as e:
