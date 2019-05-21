@@ -101,7 +101,14 @@ https://github.com/habanoz/tezos-reward-distributor/wiki/Payment-Address
 
 ### Linux Service
 
-It is possible to add tezos-reward-distributer as a Linux service. It can run in the background. In order to set up the service with default configuration arguments, run the following command:
+It is possible to add tezos-reward-distributer as a Linux service. It can run in the background. 
+
+If docker is used, make sure user is in docker group
+```
+sudo usermod -a -G docker $USER
+```
+
+In order to set up the service with default configuration arguments, run the following command:
 
 ```
 sudo python3 service_add.py
