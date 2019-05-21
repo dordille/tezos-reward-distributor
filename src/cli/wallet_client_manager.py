@@ -115,6 +115,12 @@ class WalletClientManager(SimpleClientManager):
 
         dict = self.parse_list_known_contracts_response(response)
 
+        for alias, pkh in dict:
+            try:
+                AddressValidator("known_contract").validate(pkh)
+            except Exception as e:
+                raise ClientException("Invalid response from client '{}'".format(response), e)
+
         return dict
 
     def __list_known_addresses_by_pkh(self):
@@ -124,6 +130,13 @@ class WalletClientManager(SimpleClientManager):
         response = clear_terminal_chars(response)
 
         dict = self.parse_list_known_addresses_response(response)
+
+        for pkh, dict_alias_sk in dict:
+            try:
+                AddressValidator("known_address").validate(pkh)
+            except Exception as e:
+                raise ClientException("Invalid response from client '{}'".format(response), e)
+
 
         return dict
 
